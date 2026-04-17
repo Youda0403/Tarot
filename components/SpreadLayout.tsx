@@ -22,9 +22,9 @@ export default function SpreadLayout({ cards, spread, onAllRevealed }: Props) {
   return (
     <div className="w-full space-y-4">
       <div className="text-center space-y-1">
-        <p className="text-mystic-300 text-sm">{spread.description}</p>
+        <p className="text-sky-300 text-sm">{spread.description}</p>
         {revealedCount < cards.length && (
-          <p className="text-mystic-500 text-xs">
+          <p className="text-sky-500 text-xs">
             카드를 탭하여 하나씩 공개하세요 ({revealedCount}/{cards.length})
           </p>
         )}
