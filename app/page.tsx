@@ -4,39 +4,52 @@ import { useState, useCallback } from "react";
 import QuestionForm from "@/components/QuestionForm";
 import SpreadLayout from "@/components/SpreadLayout";
 import ReadingResult from "@/components/ReadingResult";
-import { drawCards, SPREADS, type DrawnCard, type SpreadType, type SpreadInfo } from "@/lib/tarot";
+import { drawCards, type DrawnCard, type SpreadInfo } from "@/lib/tarot";
 
 type Stage = "input" | "cards" | "reading";
+
+const DEFAULT_SPREAD: SpreadInfo = {
+  type: "three",
+  count: 3,
+  positions: ["과거", "현재", "미래"],
+  description: "과거·현재·미래의 흐름을 3장으로 살펴보세요.",
+};
 
 export default function Home() {
   const [stage, setStage] = useState<Stage>("input");
   const [question, setQuestion] = useState("");
   const [cards, setCards] = useState<DrawnCard[]>([]);
-  const [spread, setSpread] = useState<SpreadInfo>(SPREADS.three);
+  const [spread, setSpread] = useState<SpreadInfo>(DEFAULT_SPREAD);
   const [readingText, setReadingText] = useState("");
   const [loadingReading, setLoadingReading] = useState(false);
   const [loadingSpread, setLoadingSpread] = useState(false);
 
-  const determineSpread = async (q: string): Promise<SpreadType> => {
+  const determineSpread = async (q: string): Promise<SpreadInfo> => {
     try {
       const res = await fetch("/api/spread", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q }),
       });
-      if (!res.ok) return "three";
+      if (!res.ok) return DEFAULT_SPREAD;
       const data = await res.json();
-      return data.spreadType ?? "three";
+      const count: number = data.count ?? 3;
+      const type = count === 1 ? "one" : count === 5 ? "five" : "three";
+      return {
+        type,
+        count,
+        positions: data.positions ?? DEFAULT_SPREAD.positions,
+        description: data.description ?? "",
+      };
     } catch {
-      return "three";
+      return DEFAULT_SPREAD;
     }
   };
 
   const handleQuestionSubmit = async (q: string) => {
     setQuestion(q);
     setLoadingSpread(true);
-    const spreadType = await determineSpread(q);
-    const chosenSpread = SPREADS[spreadType];
+    const chosenSpread = await determineSpread(q);
     setSpread(chosenSpread);
     setCards(drawCards(chosenSpread.count));
     setReadingText("");
@@ -53,7 +66,7 @@ export default function Home() {
       const res = await fetch("/api/tarot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, cards, spreadType: spread.type }),
+        body: JSON.stringify({ question, cards, spreadType: spread.type, positions: spread.positions }),
       });
 
       if (!res.ok || !res.body) throw new Error("API 오류");

@@ -7,19 +7,19 @@ type RequestBody = {
   question: string;
   cards: DrawnCard[];
   spreadType: SpreadType;
+  positions?: string[];
 };
 
 function buildPrompt(
   question: string,
   cards: DrawnCard[],
-  spreadType: SpreadType
+  positions: string[]
 ): string {
-  const spread = SPREADS[spreadType];
   const cardLines = cards
     .map((card, i) => {
       const direction = card.isReversed ? "역방향" : "정방향";
       const meaning = card.isReversed ? card.reversedMeaning : card.upright;
-      return `[${spread.positions[i]}] ${card.nameko} (${card.name}) — ${direction}\n  의미: ${meaning}\n  키워드: ${card.keywords.join(", ")}`;
+      return `[${positions[i]}] ${card.nameko} (${card.name}) — ${direction}\n  의미: ${meaning}\n  키워드: ${card.keywords.join(", ")}`;
     })
     .join("\n\n");
 
@@ -27,7 +27,7 @@ function buildPrompt(
 
 질문자의 고민: "${question}"
 
-뽑힌 카드 (${spread.description}):
+뽑힌 카드:
 ${cardLines}
 
 위 카드들을 바탕으로 다음 형식으로 타로 리딩을 해주세요:
@@ -41,7 +41,8 @@ ${cardLines}
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType } = body;
+  const { question, cards, spreadType, positions } = body;
+  const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-  const prompt = buildPrompt(question, cards, spreadType);
+  const prompt = buildPrompt(question, cards, resolvedPositions);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
