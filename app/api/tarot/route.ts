@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { type DrawnCard, type SpreadType, SPREADS } from "@/lib/tarot";
 
 export const runtime = "nodejs";
@@ -10,11 +10,7 @@ type RequestBody = {
   positions?: string[];
 };
 
-function buildPrompt(
-  question: string,
-  cards: DrawnCard[],
-  positions: string[]
-): string {
+function buildPrompt(question: string, cards: DrawnCard[], positions: string[]): string {
   const cardLines = cards
     .map((card, i) => {
       const direction = card.isReversed ? "역방향" : "정방향";
@@ -52,21 +48,20 @@ export async function POST(req: Request) {
     );
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = buildPrompt(question, cards, resolvedPositions);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const result = await model.generateContentStream(prompt);
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          if (text) {
-            controller.enqueue(encoder.encode(text));
-          }
+        const result = await ai.models.generateContentStream({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+        });
+        for await (const chunk of result) {
+          const text = chunk.text;
+          if (text) controller.enqueue(encoder.encode(text));
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "알 수 없는 오류";

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 export const runtime = "nodejs";
 
@@ -14,13 +14,7 @@ export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return Response.json(DEFAULT);
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `당신은 타로 마스터입니다. 아래 고민에 가장 잘 맞는 타로 스프레드를 설계해주세요.
 
@@ -42,8 +36,12 @@ positions 배열 길이는 반드시 count와 같아야 합니다.
 위치 이름은 2~6글자로 이 고민에 딱 맞게 창의적으로 지어주세요.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    });
+    const parsed = JSON.parse(result.text ?? "{}");
 
     const count: number = [1, 3, 5].includes(parsed.count) ? parsed.count : 3;
     const positions: string[] =
