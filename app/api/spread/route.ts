@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return Response.json(DEFAULT);
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1" });
 
   const prompt = `당신은 타로 마스터입니다. 아래 고민에 가장 잘 맞는 타로 스프레드를 설계해주세요.
 

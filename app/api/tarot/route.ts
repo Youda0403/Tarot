@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1" });
   const prompt = buildPrompt(question, cards, resolvedPositions);
 
   const encoder = new TextEncoder();
