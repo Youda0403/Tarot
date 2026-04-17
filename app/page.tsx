@@ -7,6 +7,13 @@ import ReadingResult from "@/components/ReadingResult";
 import { drawCards, type DrawnCard, type SpreadInfo } from "@/lib/tarot";
 import { detectSpread } from "@/lib/spread";
 
+const MODELS = [
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite ✨" },
+] as const;
+
+type ModelId = typeof MODELS[number]["id"];
+
 type Stage = "input" | "cards" | "reading";
 
 export default function Home() {
@@ -18,6 +25,7 @@ export default function Home() {
   const [loadingReading, setLoadingReading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
+  const [model, setModel] = useState<ModelId>("gemini-3.1-flash-lite-preview");
   const resultRef = useRef<HTMLDivElement>(null);
 
   const handleQuestionSubmit = (q: string) => {
@@ -45,6 +53,7 @@ export default function Home() {
           cards,
           spreadType: spread.type,
           positions: spread.positions,
+          model,
         }),
       });
 
@@ -115,6 +124,25 @@ export default function Home() {
           별자리와 카드가 당신의 이야기를 들려드립니다
         </p>
       </header>
+
+      {/* Model selector */}
+      {stage === "input" && (
+        <div className="flex gap-2">
+          {MODELS.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setModel(m.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                model === m.id
+                  ? "bg-mystic-700 border-mystic-500 text-white"
+                  : "bg-transparent border-mystic-700/50 text-mystic-400 hover:border-mystic-500"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {stage === "input" && (
         <div className="w-full max-w-xl">

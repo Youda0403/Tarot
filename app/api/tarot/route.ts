@@ -8,6 +8,7 @@ type RequestBody = {
   cards: DrawnCard[];
   spreadType: SpreadType;
   positions?: string[];
+  model?: string;
 };
 
 function buildPrompt(question: string, cards: DrawnCard[], positions: string[]): string {
@@ -37,8 +38,9 @@ ${cardLines}
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType, positions } = body;
+  const { question, cards, spreadType, positions, model: selectedModel } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
+  const modelId = selectedModel ?? "gemini-2.5-flash";
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       streamResult = await ai.models.generateContentStream({
-        model: "gemini-2.5-flash",
+        model: modelId,
         contents: prompt,
       });
       break;
