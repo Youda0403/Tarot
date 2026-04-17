@@ -54,21 +54,31 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      try {
-        const result = await ai.models.generateContentStream({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-        });
-        for await (const chunk of result) {
-          const text = chunk.text;
-          if (text) controller.enqueue(encoder.encode(text));
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          const result = await ai.models.generateContentStream({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+          });
+          for await (const chunk of result) {
+            const text = chunk.text;
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+          break;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+          const is503 = msg.includes("503") || msg.includes("UNAVAILABLE");
+          retries--;
+          if (is503 && retries > 0) {
+            await new Promise((r) => setTimeout(r, (3 - retries) * 1500));
+            continue;
+          }
+          controller.enqueue(encoder.encode(`\n\n오류: ${msg}`));
+          break;
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "알 수 없는 오류";
-        controller.enqueue(encoder.encode(`\n\n오류: ${msg}`));
-      } finally {
-        controller.close();
       }
+      controller.close();
     },
   });
 

@@ -8,6 +8,23 @@ const DEFAULT = {
   description: "과거·현재·미래의 흐름을 3장으로 살펴보세요.",
 };
 
+async function callWithRetry(fn: () => Promise<string>, retries = 3): Promise<string> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const is503 = msg.includes("503") || msg.includes("UNAVAILABLE");
+      if (is503 && i < retries - 1) {
+        await new Promise((r) => setTimeout(r, (i + 1) * 1500));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("최대 재시도 횟수 초과");
+}
+
 export async function POST(req: Request) {
   const { question } = await req.json();
 
@@ -25,23 +42,23 @@ export async function POST(req: Request) {
 - 3장: 일반적인 상황, 감정, 인간관계 (가장 일반적)
 - 5장: 복잡한 진로, 깊은 관계 갈등, 여러 요소가 얽힌 고민
 
-다음 JSON 스키마로 응답하세요:
-{
-  "count": 3,
-  "positions": ["이 고민에 맞는 위치 이름1", "위치 이름2", "위치 이름3"],
-  "description": "이 스프레드에 대한 한 문장 설명"
-}
+반드시 아래 JSON 형식만 출력하세요 (다른 텍스트 없이):
+{"count": 3, "positions": ["위치1", "위치2", "위치3"], "description": "한 문장 설명"}
 
-positions 배열 길이는 반드시 count와 같아야 합니다.
-위치 이름은 2~6글자로 이 고민에 딱 맞게 창의적으로 지어주세요.`;
+positions 길이는 count와 같아야 합니다. 위치 이름은 2~6글자로 이 고민에 딱 맞게 지어주세요.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
+    const text = await callWithRetry(async () => {
+      const result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      return result.text ?? "";
     });
-    const parsed = JSON.parse(result.text ?? "{}");
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("JSON not found");
+    const parsed = JSON.parse(jsonMatch[0]);
 
     const count: number = [1, 3, 5].includes(parsed.count) ? parsed.count : 3;
     const positions: string[] =
