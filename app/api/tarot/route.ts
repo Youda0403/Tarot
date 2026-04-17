@@ -108,23 +108,32 @@ export async function POST(req: Request) {
       const completion = await groq.chat.completions.create({
         model: resolvedModel,
         messages,
-        stream: true,
+        stream: false,
         temperature: 0.85,
         max_tokens: 1800,
       });
 
+      const rawText = completion.choices[0]?.message?.content ?? "";
+
+      // Strip CJK characters (Chinese/Japanese) then clean up artifacts
+      const cleanText = rawText
+        .replace(/[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]+/g, "")
+        .replace(/\(\s*\)/g, "")   // remove empty parens like ()
+        .replace(/ {2,}/g, " ")    // collapse double spaces
+        .trim();
+
+      // Simulate streaming by sending chunks so the UI still shows a typing effect
       const stream = new ReadableStream({
         async start(controller) {
-          try {
-            for await (const chunk of completion) {
-              const raw = chunk.choices[0]?.delta?.content ?? "";
-              // Strip CJK characters (Chinese/Japanese) that model sometimes outputs
-              const text = raw.replace(/[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g, "");
-              if (text) controller.enqueue(encoder.encode(text));
+          const CHUNK = 15;
+          const DELAY = 10;
+          for (let i = 0; i < cleanText.length; i += CHUNK) {
+            controller.enqueue(encoder.encode(cleanText.slice(i, i + CHUNK)));
+            if (i + CHUNK < cleanText.length) {
+              await new Promise((r) => setTimeout(r, DELAY));
             }
-          } finally {
-            controller.close();
           }
+          controller.close();
         },
       });
 
