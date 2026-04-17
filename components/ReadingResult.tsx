@@ -3,10 +3,12 @@
 type Props = {
   text: string;
   loading: boolean;
+  isError: boolean;
+  onRetry: () => void;
 };
 
-export default function ReadingResult({ text, loading }: Props) {
-  if (!text && !loading) return null;
+export default function ReadingResult({ text, loading, isError, onRetry }: Props) {
+  if (!text && !loading && !isError) return null;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -32,7 +34,23 @@ export default function ReadingResult({ text, loading }: Props) {
               <span className="text-sm">별자리의 기운을 읽는 중...</span>
             </div>
           )}
-          {text && (
+
+          {isError && !loading && (
+            <div className="flex flex-col items-center gap-4 py-2">
+              <p className="text-mystic-300 text-sm text-center leading-relaxed">
+                🌫️ AI 서버가 잠시 혼잡해요.<br />
+                카드는 그대로 유지되니 해석만 다시 요청해보세요.
+              </p>
+              <button
+                onClick={onRetry}
+                className="px-6 py-2.5 rounded-2xl bg-mystic-700/60 border border-mystic-500/50 text-mystic-200 text-sm hover:bg-mystic-600/60 transition-colors"
+              >
+                ✨ 해석 재생성
+              </button>
+            </div>
+          )}
+
+          {text && !isError && (
             <div className="text-mystic-100 text-sm leading-relaxed whitespace-pre-wrap">
               {text}
               {loading && (

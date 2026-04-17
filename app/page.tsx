@@ -16,6 +16,7 @@ export default function Home() {
   const [spread, setSpread] = useState<SpreadInfo | null>(null);
   const [readingText, setReadingText] = useState("");
   const [loadingReading, setLoadingReading] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -32,6 +33,7 @@ export default function Home() {
     if (!spread) return;
     setStage("reading");
     setLoadingReading(true);
+    setIsError(false);
     setReadingText("");
 
     try {
@@ -58,7 +60,7 @@ export default function Home() {
         setReadingText(text);
       }
     } catch {
-      setReadingText("해석을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      setIsError(true);
     } finally {
       setLoadingReading(false);
     }
@@ -93,6 +95,7 @@ export default function Home() {
     setSpread(null);
     setReadingText("");
     setLoadingReading(false);
+    setIsError(false);
   };
 
   return (
@@ -138,7 +141,12 @@ export default function Home() {
             />
 
             {stage === "reading" && (
-              <ReadingResult text={readingText} loading={loadingReading} />
+              <ReadingResult
+                text={readingText}
+                loading={loadingReading}
+                isError={isError}
+                onRetry={handleAllRevealed}
+              />
             )}
           </div>
 
