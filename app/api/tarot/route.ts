@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { type DrawnCard, type SpreadType, SPREADS } from "@/lib/tarot";
 
 export const runtime = "nodejs";
@@ -38,60 +38,38 @@ ${cardLines}
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType, positions, model: selectedModel } = body;
+  const { question, cards, spreadType, positions } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
-  const modelId = selectedModel ?? "gemini-2.5-flash";
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "GEMINI_API_KEY가 설정되지 않았습니다." }),
+      JSON.stringify({ error: "GROQ_API_KEY가 설정되지 않았습니다." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const ai = new GoogleGenAI({ apiKey, apiVersion: "v1" });
+  const groq = new Groq({ apiKey });
   const prompt = buildPrompt(question, cards, resolvedPositions);
 
-  // 스트리밍 전에 먼저 연결 확인 (재시도 포함)
-  let streamResult;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      streamResult = await ai.models.generateContentStream({
-        model: modelId,
-        contents: prompt,
-      });
-      break;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      const is503 = msg.includes("503") || msg.includes("UNAVAILABLE");
-      if (is503 && attempt < 2) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
-        continue;
-      }
-      return new Response(JSON.stringify({ error: msg }), {
-        status: 503,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }
-
-  if (!streamResult) {
-    return new Response(JSON.stringify({ error: "서버가 혼잡합니다." }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   const encoder = new TextEncoder();
-  const captured = streamResult;
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of captured) {
-          const text = chunk.text;
+        const completion = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          stream: true,
+          temperature: 0.8,
+          max_tokens: 1500,
+        });
+        for await (const chunk of completion) {
+          const text = chunk.choices[0]?.delta?.content ?? "";
           if (text) controller.enqueue(encoder.encode(text));
         }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+        controller.enqueue(encoder.encode(`\n\n오류: ${msg}`));
       } finally {
         controller.close();
       }

@@ -8,8 +8,8 @@ import { drawCards, type DrawnCard, type SpreadInfo } from "@/lib/tarot";
 import { detectSpread } from "@/lib/spread";
 
 const MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite ✨" },
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (추천)" },
+  { id: "gemma2-9b-it", label: "Gemma2 9B (빠름)" },
 ] as const;
 
 type ModelId = typeof MODELS[number]["id"];
@@ -25,7 +25,7 @@ export default function Home() {
   const [loadingReading, setLoadingReading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
-  const [model, setModel] = useState<ModelId>("gemini-3.1-flash-lite-preview");
+  const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
   const resultRef = useRef<HTMLDivElement>(null);
 
   const handleQuestionSubmit = (q: string) => {
