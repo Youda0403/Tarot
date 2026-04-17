@@ -16,6 +16,13 @@ const TONES: { id: Tone; label: string; desc: string }[] = [
   { id: "sharp", label: "🔮 날카롭게", desc: "직관적이고 핵심을 찌르는 말투" },
 ];
 
+const MODELS = [
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "정교한 해석" },
+  { id: "gemma2-9b-it", label: "Gemma2 9B", desc: "빠른 응답" },
+] as const;
+
+type ModelId = (typeof MODELS)[number]["id"];
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("input");
   const [question, setQuestion] = useState("");
@@ -26,6 +33,7 @@ export default function Home() {
   const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
   const [tone, setTone] = useState<Tone>("standard");
+  const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
   const resultRef = useRef<HTMLDivElement>(null);
 
   const handleQuestionSubmit = (q: string) => {
@@ -54,6 +62,7 @@ export default function Home() {
           spreadType: spread.type,
           positions: spread.positions,
           tone,
+          model,
         }),
       });
 
@@ -79,7 +88,7 @@ export default function Home() {
     } finally {
       setLoadingReading(false);
     }
-  }, [question, cards, spread, tone]);
+  }, [question, cards, spread, tone, model]);
 
   const handleSaveImage = async () => {
     if (!resultRef.current) return;
@@ -87,7 +96,7 @@ export default function Home() {
     try {
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(resultRef.current, {
-        backgroundColor: "#07192b",
+        backgroundColor: "#e0f2fe",
         scale: 2,
         useCORS: true,
         logging: false,
@@ -117,10 +126,10 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center px-4 py-12 gap-8">
       {/* Header */}
       <header className="text-center space-y-2">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-sky-300 via-ocean-200 to-sky-300 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-sky-700 via-ocean-500 to-sky-700 bg-clip-text text-transparent">
           ✨ 타로 리딩
         </h1>
-        <p className="text-sky-400 text-sm">
+        <p className="text-sky-600 text-sm">
           별자리와 카드가 당신의 이야기를 들려드립니다
         </p>
       </header>
@@ -129,7 +138,7 @@ export default function Home() {
         <>
           {/* Tone selector */}
           <div className="w-full max-w-xl space-y-2">
-            <p className="text-sky-400 text-xs text-center">리딩 톤 선택</p>
+            <p className="text-sky-600 text-xs text-center font-medium">리딩 톤</p>
             <div className="flex gap-2 justify-center">
               {TONES.map((t) => (
                 <button
@@ -138,11 +147,33 @@ export default function Home() {
                   title={t.desc}
                   className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                     tone === t.id
-                      ? "bg-sky-700/70 border-sky-400 text-white shadow-lg shadow-sky-900/40"
-                      : "bg-transparent border-sky-700/40 text-sky-400 hover:border-sky-500"
+                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
+                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
                   }`}
                 >
                   {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Model selector */}
+          <div className="w-full max-w-xl space-y-2">
+            <p className="text-sky-600 text-xs text-center font-medium">AI 모델</p>
+            <div className="flex gap-2 justify-center">
+              {MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setModel(m.id)}
+                  title={m.desc}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
+                    model === m.id
+                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
+                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
+                  }`}
+                >
+                  {m.label}
+                  <span className="ml-1.5 opacity-70">{m.desc}</span>
                 </button>
               ))}
             </div>
@@ -157,18 +188,18 @@ export default function Home() {
       {(stage === "cards" || stage === "reading") && spread && (
         <div className="w-full max-w-2xl space-y-8">
           {/* Question recap */}
-          <div className="text-center bg-sky-950/50 border border-sky-700/30 rounded-2xl px-5 py-3">
-            <p className="text-sky-400 text-xs mb-1">질문</p>
-            <p className="text-sky-100 text-sm">{question}</p>
+          <div className="text-center bg-white/50 border border-sky-300/60 rounded-2xl px-5 py-3">
+            <p className="text-sky-600 text-xs mb-1">질문</p>
+            <p className="text-sky-900 text-sm">{question}</p>
           </div>
 
           {/* Spread badge */}
           <div className="flex flex-col items-center gap-1">
-            <span className="px-4 py-1.5 rounded-full bg-sky-900/60 border border-sky-600/40 text-sky-300 text-xs font-medium">
+            <span className="px-4 py-1.5 rounded-full bg-sky-100 border border-sky-300 text-sky-700 text-xs font-medium">
               {spread.count}장 스프레드
             </span>
             {spread.description && (
-              <p className="text-sky-500 text-xs">{spread.description}</p>
+              <p className="text-sky-600 text-xs">{spread.description}</p>
             )}
           </div>
 
@@ -191,13 +222,13 @@ export default function Home() {
               <button
                 onClick={handleSaveImage}
                 disabled={savingImage}
-                className="px-6 py-2.5 rounded-2xl bg-sky-700/60 border border-sky-500/50 text-sky-200 text-sm hover:bg-sky-600/60 transition-colors disabled:opacity-50"
+                className="px-6 py-2.5 rounded-2xl bg-sky-600 border border-sky-500 text-white text-sm hover:bg-sky-700 transition-colors disabled:opacity-50 shadow-sm"
               >
                 {savingImage ? "저장 중..." : "🖼️ 이미지로 저장"}
               </button>
               <button
                 onClick={handleReset}
-                className="px-6 py-2.5 rounded-2xl border border-sky-600/50 text-sky-300 text-sm hover:bg-sky-800/40 transition-colors"
+                className="px-6 py-2.5 rounded-2xl bg-white/60 border border-sky-300 text-sky-700 text-sm hover:bg-white/80 transition-colors shadow-sm"
               >
                 🔄 다시 뽑기
               </button>

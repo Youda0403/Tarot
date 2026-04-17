@@ -11,6 +11,7 @@ type RequestBody = {
   spreadType: SpreadType;
   positions?: string[];
   tone?: Tone;
+  model?: string;
 };
 
 function getToneInstruction(tone: Tone): string {
@@ -60,8 +61,11 @@ ${cardLines}
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType, positions, tone = "standard" } = body;
+  const { question, cards, spreadType, positions, tone = "standard", model = "llama-3.3-70b-versatile" } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
+  const resolvedModel = ["llama-3.3-70b-versatile", "gemma2-9b-it"].includes(model)
+    ? model
+    : "llama-3.3-70b-versatile";
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -82,7 +86,7 @@ export async function POST(req: Request) {
     attempt++;
     try {
       const completion = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: resolvedModel,
         messages: [{ role: "user", content: prompt }],
         stream: true,
         temperature: 0.85,
