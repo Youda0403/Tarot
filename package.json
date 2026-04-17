@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.90.0",
     "@google/genai": "^1.50.1",
     "@google/generative-ai": "^0.24.1",
+    "html2canvas": "^1.4.1",
     "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
