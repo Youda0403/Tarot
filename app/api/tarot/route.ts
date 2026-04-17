@@ -25,7 +25,24 @@ function getToneInstruction(tone: Tone): string {
   }
 }
 
-function buildPrompt(question: string, cards: DrawnCard[], positions: string[], tone: Tone): string {
+const SYSTEM_PROMPT = `You are an expert tarot reader with 20 years of experience. You MUST follow these rules without exception:
+
+LANGUAGE RULES (CRITICAL):
+- Write ONLY in Korean (한국어). Do NOT use any Chinese characters (漢字), Japanese hiragana, katakana, or any CJK characters under any circumstances.
+- Do NOT mix in any English words, Latin phrases, or foreign language terms.
+- Use ONLY Korean Hangul (가-힣), standard Korean punctuation, and Arabic numerals.
+- Card names in English (in parentheses) are the only exception.
+
+FORMAT RULES (CRITICAL):
+- Do NOT use any markdown: no **, no *, no #, no >, no - bullet points, no backticks.
+- Section headers must use plain text with a colon only (e.g. "각 카드 해석:").
+- Use natural paragraph breaks with blank lines between sections.
+
+SPEECH STYLE:
+- Always use polite Korean ending style: ~해요, ~예요, ~이에요, ~아요/어요.
+- Never use formal ~합니다 style or casual 반말.`;
+
+function buildMessages(question: string, cards: DrawnCard[], positions: string[], tone: Tone) {
   const cardLines = cards
     .map((card, i) => {
       const direction = card.isReversed ? "역방향" : "정방향";
@@ -36,33 +53,30 @@ function buildPrompt(question: string, cards: DrawnCard[], positions: string[], 
 
   const toneInstruction = getToneInstruction(tone);
 
-  return `당신은 20년 경력의 타로 마스터예요. 깊은 영적 통찰력과 심리적 이해를 바탕으로 카드를 읽어드려요.
-
-[언어 규칙 — 절대 준수]
-- 반드시 한국어로만 작성해요. 영어, 라틴어, 기타 외국어 단어를 절대 섞지 않아요.
-- 카드 이름은 괄호 안 영어 원명을 제외하고 모두 한국어로 표기해요.
-- **, *, #, >, - 등 마크다운 기호를 절대 사용하지 않아요.
-- 섹션 제목은 꺾쇠(〔〕) 없이 줄바꿈으로 구분하고, 제목 뒤에 콜론(:)을 붙여요.
-- 말투는 반드시 '~해요', '~예요', '~이에요', '~아요/어요' 체를 일관되게 사용해요.
-- ${toneInstruction}
+  const userContent = `${toneInstruction}
 
 질문자의 고민: "${question}"
 
 뽑힌 카드:
 ${cardLines}
 
-아래 구조로 타로 리딩을 작성해요. 마크다운 없이 일반 텍스트로만 작성해요.
+아래 구조로 타로 리딩을 작성해요. 반드시 순수 한국어(한글)로만, 마크다운 없이 작성해요.
 
 각 카드 해석:
-각 카드의 위치 의미와 카드의 메시지를 연결하여 2~3문장씩 해석해요. 카드의 상징과 에너지가 질문자의 상황에 어떻게 연결되는지 구체적으로 설명해요.
+각 카드의 위치 의미와 카드의 메시지를 연결하여 2~3문장씩 해석해요.
 
 종합 메시지:
-카드 전체가 전하는 핵심 흐름과 조언을 3~4문장으로 정리해요. 각 카드 사이의 연결고리와 전체적인 에너지 흐름을 읽어드려요.
+카드 전체가 전하는 핵심 흐름과 조언을 3~4문장으로 정리해요.
 
 지금 당신에게 필요한 것:
-질문자가 지금 바로 실천할 수 있는 구체적인 행동이나 마음가짐 한 가지를 제안해요.
+지금 바로 실천할 수 있는 구체적인 행동이나 마음가짐 한 가지를 제안해요.
 
-부정적인 예언이나 공포를 조장하는 표현은 절대 사용하지 않아요. 역방향 카드도 성장과 변화의 기회로 긍정적으로 해석해요.`;
+부정적인 예언은 하지 않아요. 역방향 카드도 성장과 변화의 기회로 해석해요.`;
+
+  return [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    { role: "user" as const, content: userContent },
+  ];
 }
 
 export async function POST(req: Request) {
@@ -82,7 +96,7 @@ export async function POST(req: Request) {
   }
 
   const groq = new Groq({ apiKey });
-  const prompt = buildPrompt(question, cards, resolvedPositions, tone);
+  const messages = buildMessages(question, cards, resolvedPositions, tone);
 
   const encoder = new TextEncoder();
   let attempt = 0;
@@ -93,7 +107,7 @@ export async function POST(req: Request) {
     try {
       const completion = await groq.chat.completions.create({
         model: resolvedModel,
-        messages: [{ role: "user", content: prompt }],
+        messages,
         stream: true,
         temperature: 0.85,
         max_tokens: 1800,
