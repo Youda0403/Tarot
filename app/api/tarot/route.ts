@@ -117,7 +117,9 @@ export async function POST(req: Request) {
         async start(controller) {
           try {
             for await (const chunk of completion) {
-              const text = chunk.choices[0]?.delta?.content ?? "";
+              const raw = chunk.choices[0]?.delta?.content ?? "";
+              // Strip CJK characters (Chinese/Japanese) that model sometimes outputs
+              const text = raw.replace(/[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g, "");
               if (text) controller.enqueue(encoder.encode(text));
             }
           } finally {

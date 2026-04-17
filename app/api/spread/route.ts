@@ -1,56 +1,71 @@
 import Groq from "groq-sdk";
+import { detectSpread } from "@/lib/spread";
 
 export const runtime = "nodejs";
-
-const DEFAULT = {
-  count: 3,
-  positions: ["과거의 영향", "현재 에너지", "미래의 가능성"],
-  description: "흐름을 3장으로 살펴보세요.",
-};
 
 export async function POST(req: Request) {
   const { question } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return Response.json(DEFAULT);
+  if (!apiKey) return Response.json(detectSpread(question));
 
   const groq = new Groq({ apiKey });
-
-  const prompt = `당신은 타로 마스터입니다. 아래 고민에 가장 잘 맞는 타로 스프레드를 설계해주세요.
-
-고민: "${question}"
-
-카드 수 기준:
-- 1장: 간단한 yes/no, 오늘의 메시지
-- 3장: 일반적인 상황, 감정, 인간관계 (가장 일반적)
-- 5장: 복잡한 진로, 깊은 관계 갈등, 여러 요소가 얽힌 고민
-
-반드시 아래 JSON 형식만 출력하세요 (다른 텍스트 없이):
-{"count": 3, "positions": ["위치1", "위치2", "위치3"], "description": "한 문장 설명"}
-
-positions 길이는 count와 같아야 합니다. 위치 이름은 2~6글자로 이 고민에 딱 맞게 지어주세요.`;
 
   try {
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a tarot spread designer. Respond ONLY with a single valid JSON object. No explanation, no markdown, no extra text.",
+        },
+        {
+          role: "user",
+          content: `Design the most fitting tarot spread for this question: "${question}"
+
+Return ONLY this JSON:
+{"count": <1|3|5>, "positions": [<Korean strings>], "description": "<one sentence in Korean>"}
+
+Rules:
+- 1 card: yes/no or very short questions
+- 3 cards: most questions — invent CREATIVE Korean position names that match this exact question's theme
+- 5 cards: major life decisions, complex conflicts
+
+Creative 3-card position examples (match the theme, don't just copy):
+- Love: ["나의 마음", "상대의 마음", "우리의 앞날"]
+- Career choice: ["현재 에너지", "넘어야 할 관문", "결실"]
+- Self-doubt: ["지금의 나", "내가 놓친 것", "나아갈 방향"]
+- Conflict: ["상황의 본질", "숨겨진 요소", "해결의 실마리"]
+- Decision: ["선택의 에너지", "고려해야 할 것", "최선의 방향"]
+
+positions array length MUST equal count. Respond ONLY with JSON.`,
+        },
+      ],
+      temperature: 0.6,
       max_tokens: 200,
     });
 
     const text = completion.choices[0]?.message?.content ?? "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("JSON not found");
-    const parsed = JSON.parse(jsonMatch[0]);
+    if (!jsonMatch) throw new Error("no JSON");
 
+    const parsed = JSON.parse(jsonMatch[0]);
     const count: number = [1, 3, 5].includes(parsed.count) ? parsed.count : 3;
     const positions: string[] =
       Array.isArray(parsed.positions) && parsed.positions.length === count
         ? parsed.positions
-        : DEFAULT.positions;
+        : detectSpread(question).positions;
 
-    return Response.json({ count, positions, description: parsed.description ?? "" });
+    const type = count === 1 ? "one" : count === 5 ? "five" : "three";
+
+    return Response.json({
+      type,
+      count,
+      positions,
+      description: typeof parsed.description === "string" ? parsed.description : "",
+    });
   } catch {
-    return Response.json(DEFAULT);
+    return Response.json(detectSpread(question));
   }
 }

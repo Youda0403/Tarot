@@ -6,6 +6,7 @@ import SpreadLayout from "@/components/SpreadLayout";
 import ReadingResult from "@/components/ReadingResult";
 import { drawCards, type DrawnCard, type SpreadInfo } from "@/lib/tarot";
 import { detectSpread } from "@/lib/spread";
+import type { SpreadType } from "@/lib/tarot";
 
 type Stage = "input" | "cards" | "reading";
 export type Tone = "soft" | "standard" | "sharp";
@@ -29,6 +30,7 @@ export default function Home() {
   const [cards, setCards] = useState<DrawnCard[]>([]);
   const [spread, setSpread] = useState<SpreadInfo | null>(null);
   const [readingText, setReadingText] = useState("");
+  const [loadingSpread, setLoadingSpread] = useState(false);
   const [loadingReading, setLoadingReading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
@@ -36,12 +38,33 @@ export default function Home() {
   const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
   const resultRef = useRef<HTMLDivElement>(null);
 
-  const handleQuestionSubmit = (q: string) => {
+  const handleQuestionSubmit = async (q: string) => {
     setQuestion(q);
-    const chosenSpread = detectSpread(q);
+    setLoadingSpread(true);
+    setReadingText("");
+
+    let chosenSpread: SpreadInfo;
+    try {
+      const res = await fetch("/api/spread", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q }),
+      });
+      if (!res.ok) throw new Error("spread API failed");
+      const data = await res.json();
+      chosenSpread = {
+        type: (data.type ?? "three") as SpreadType,
+        count: data.count,
+        positions: data.positions,
+        description: data.description ?? "",
+      };
+    } catch {
+      chosenSpread = detectSpread(q);
+    }
+
     setSpread(chosenSpread);
     setCards(drawCards(chosenSpread.count));
-    setReadingText("");
+    setLoadingSpread(false);
     setStage("cards");
   };
 
@@ -180,7 +203,22 @@ export default function Home() {
           </div>
 
           <div className="w-full max-w-xl">
-            <QuestionForm onSubmit={handleQuestionSubmit} loading={false} />
+            {loadingSpread ? (
+              <div className="flex flex-col items-center gap-3 py-8 text-sky-600">
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-sky-500 animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </div>
+                <p className="text-sm">고민을 읽고 스프레드를 짜는 중이에요...</p>
+              </div>
+            ) : (
+              <QuestionForm onSubmit={handleQuestionSubmit} loading={false} />
+            )}
           </div>
         </>
       )}
