@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const prompt = `다음 질문에 가장 어울리는 타로 스프레드를 골라주세요.
 
