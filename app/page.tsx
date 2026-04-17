@@ -48,7 +48,8 @@ export default function Home() {
         }),
       });
 
-      if (!res.ok || !res.body) throw new Error("API 오류");
+      if (!res.ok) throw new Error("API 오류");
+      if (!res.body) throw new Error("응답 없음");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -58,6 +59,12 @@ export default function Home() {
         if (done) break;
         text += decoder.decode(value, { stream: true });
         setReadingText(text);
+      }
+
+      // 스트림에 오류가 섞여 들어온 경우 감지
+      if (text.includes('"code":503') || text.includes("UNAVAILABLE") || text.includes('"status":"Service Unavailable"')) {
+        setReadingText("");
+        setIsError(true);
       }
     } catch {
       setIsError(true);

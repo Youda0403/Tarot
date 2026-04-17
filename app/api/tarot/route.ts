@@ -51,34 +51,48 @@ export async function POST(req: Request) {
   const ai = new GoogleGenAI({ apiKey, apiVersion: "v1" });
   const prompt = buildPrompt(question, cards, resolvedPositions);
 
+  // 스트리밍 전에 먼저 연결 확인 (재시도 포함)
+  let streamResult;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      streamResult = await ai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      const is503 = msg.includes("503") || msg.includes("UNAVAILABLE");
+      if (is503 && attempt < 2) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+        continue;
+      }
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  if (!streamResult) {
+    return new Response(JSON.stringify({ error: "서버가 혼잡합니다." }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const encoder = new TextEncoder();
+  const captured = streamResult;
   const stream = new ReadableStream({
     async start(controller) {
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          const result = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-          });
-          for await (const chunk of result) {
-            const text = chunk.text;
-            if (text) controller.enqueue(encoder.encode(text));
-          }
-          break;
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "알 수 없는 오류";
-          const is503 = msg.includes("503") || msg.includes("UNAVAILABLE");
-          retries--;
-          if (is503 && retries > 0) {
-            await new Promise((r) => setTimeout(r, (3 - retries) * 1500));
-            continue;
-          }
-          controller.enqueue(encoder.encode(`\n\n오류: ${msg}`));
-          break;
+      try {
+        for await (const chunk of captured) {
+          const text = chunk.text;
+          if (text) controller.enqueue(encoder.encode(text));
         }
+      } finally {
+        controller.close();
       }
-      controller.close();
     },
   });
 
