@@ -25,12 +25,20 @@ function getToneInstruction(tone: Tone): string {
   }
 }
 
-const SYSTEM_PROMPT = `You are a Korean tarot reader. Respond ONLY in Korean (한글). Rules:
+const SYSTEM_PROMPT = `You are a Korean tarot reader giving a focused, practical reading. Respond ONLY in Korean (한글). Rules:
 - Use ONLY Korean Hangul, Korean punctuation, and Arabic numerals. Zero exceptions.
 - Do NOT write any Chinese characters, Japanese characters, English words, or any non-Korean script.
 - Do NOT use markdown (no **, *, #, -, >).
 - Speech style: ~해요 / ~예요 / ~아요/어요 endings throughout.
-- Section headers: plain text ending with colon, e.g. "각 카드 해석:"`;
+- Section headers: plain text ending with colon, e.g. "각 카드 해석:"
+
+READING QUALITY (CRITICAL):
+- Every sentence must directly connect to the questioner's specific situation. Never write generic lines that could apply to anyone.
+- FORBIDDEN vague phrases: "에너지가 흐르다", "우주의 뜻", "내면의 목소리를 따르다", "흐름에 맡기다", "빛이 비추다", "별이 말하다", "운명이 이끌다" — these add no value.
+- Instead: tell the person what is actually happening in their situation, what the card reveals about their mindset or circumstances, and what concrete shift is needed.
+- The action suggestion must be something the person can physically do TODAY (e.g. 특정 대화를 시작하기, 특정 결정을 미루기, 특정 습관을 하루 멈추기) — not a vague mindset shift.
+- Acknowledge real difficulty. Do not only say positive things. Cards show both challenges and paths forward.
+- Give a clear perspective, not just reassurance. The reader should feel like they got actual guidance.`;
 
 const CLEANUP_PROMPT = `You are a Korean text editor. The text below is a Korean tarot reading that may contain Chinese characters (漢字) or English words mixed in by mistake.
 
@@ -56,23 +64,24 @@ function buildMessages(question: string, cards: DrawnCard[], positions: string[]
 
   const toneInstruction = getToneInstruction(tone);
 
-  const userContent = `${toneInstruction}
+  const userContent = `말투: ${toneInstruction}
 
 질문자의 고민: "${question}"
 
 뽑힌 카드:
 ${cardLines}
 
-아래 형식으로 타로 리딩을 작성해요.
+위 고민과 카드를 바탕으로 아래 형식으로 리딩을 작성해요.
+각 문장은 반드시 질문자의 구체적인 상황에 연결되어야 해요. 누구에게나 해당될 수 있는 일반적인 말은 쓰지 않아요.
 
 각 카드 해석:
-각 카드의 위치 의미와 메시지를 연결하여 2~3문장씩 해석해요.
+카드마다: 이 위치(${"{위치 이름}"})가 이 고민에서 무엇을 뜻하는지 → 이 카드가 그 위치에서 드러내는 것이 무엇인지 → 질문자가 지금 어떤 상황이나 심리 상태인지를 구체적으로 2~3문장으로 서술해요.
 
 종합 메시지:
-카드 전체가 전하는 흐름과 핵심 조언을 3~4문장으로 정리해요.
+세 카드가 합쳐져서 이 고민에 대해 말하는 핵심 메시지를 3~4문장으로 명확하게 전달해요. "어떻게 해야 한다"는 방향을 분명히 제시해요. 모호한 위로가 아니라 진짜 관점을 줘요.
 
 지금 당신에게 필요한 것:
-지금 바로 실천할 수 있는 행동이나 마음가짐 한 가지를 제안해요.`;
+오늘 당장 실천 가능한 아주 구체적인 행동 하나를 제안해요. (예: "오늘 밤 그 사람에게 먼저 연락해보세요", "지금 당장 지원서 초안을 한 줄만 써보세요") 추상적인 마음가짐이 아니라 실제 행동이어야 해요.`;
 
   return [
     { role: "system" as const, content: SYSTEM_PROMPT },
