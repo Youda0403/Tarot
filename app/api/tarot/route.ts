@@ -101,7 +101,6 @@ export async function POST(req: Request) {
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
   const ALLOWED_MODELS = [
     "llama-3.3-70b-versatile",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
     "meta-llama/llama-4-scout-17b-16e-instruct",
   ];
   const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
