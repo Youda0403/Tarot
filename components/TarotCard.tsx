@@ -14,11 +14,13 @@ type Props = {
 
 export default function TarotCard({ card, position, index, revealed, onReveal, onShowDetail }: Props) {
   const [flipped, setFlipped] = useState(false);
+  const [popped, setPopped] = useState(false);
 
   const handleClick = () => {
     if (!flipped) {
       setFlipped(true);
       setTimeout(onReveal, 300);
+      setTimeout(() => setPopped(true), 700);
     }
   };
 
@@ -33,20 +35,24 @@ export default function TarotCard({ card, position, index, revealed, onReveal, o
         onClick={handleClick}
       >
         <div
-          className="relative w-full h-full transition-transform duration-700"
+          className="relative w-full h-full"
           style={{
             transformStyle: "preserve-3d",
             transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: popped ? "none" : "transform 0.7s ease-in-out",
+            animation: popped ? "card-reveal 0.35s ease-out" : undefined,
           }}
         >
           {/* Card back */}
           <div
-            className="absolute inset-0 rounded-2xl border border-sky-400 flex items-center justify-center overflow-hidden shadow-md"
+            className={`absolute inset-0 rounded-2xl border border-sky-400 flex items-center justify-center overflow-hidden transition-shadow duration-300 ${
+              !flipped ? "shadow-lg shadow-sky-400/50" : "shadow-md"
+            }`}
             style={{ backfaceVisibility: "hidden" }}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-ocean-400 to-sky-500" />
             <div className="absolute inset-2 rounded-xl border border-white/40" />
-            <span className="relative text-4xl">🌟</span>
+            <span className={`relative text-4xl ${!flipped ? "animate-pulse" : ""}`}>🌟</span>
           </div>
 
           {/* Card front */}

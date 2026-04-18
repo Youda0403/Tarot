@@ -7,8 +7,8 @@ const FOREIGN_RE = /[^\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F0-9\s.,!?:;()\-""''
 const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
 /** 반말 endings at sentence boundaries
- *  이야 제외 — fixBanmal에서 문장 끝 구두점 한정으로만 처리 (받아들이야 함을 오탐 방지) */
-const BANMAL_RE = /[가-힣](거야|잖아|했어|겠어|하자|이라)([.?!\s]|$)/;
+ *  이야·이라 제외 — fixBanmal에서 구두점 한정으로 처리 (이라 할 수 있어요 등 오탐 방지) */
+const BANMAL_RE = /[가-힣](거야|잖아|했어|겠어|하자)([.?!\s]|$)/;
 
 export const CLEANUP_PROMPT = `You are a Korean text editor. Fix the following Korean text:
 1. Replace ALL foreign characters (Chinese, Japanese, Greek α β, Vietnamese đ ả, Arabic, or any non-Korean script) with natural Korean equivalents.
@@ -39,7 +39,8 @@ export function fixBanmal(text: string): string {
     .replace(/([가-힣])했어([.?!\s]|$)/g, "$1했어요$2")
     .replace(/([가-힣])겠어([.?!\s]|$)/g, "$1겠어요$2")
     .replace(/([가-힣])하자([.?!\s]|$)/g, "$1해요$2")
-    .replace(/([가-힣])이라([.?!\s]|$)/g, "$1이에요$2");
+    // 이라: 구두점/줄바꿈/끝에만 적용 (이라 할 수 있어요 / 이라 불리다 등 인용 표현 오탐 방지)
+    .replace(/([가-힣])이라([.?!\n]|$)/g, "$1이에요$2");
 }
 
 /** Whitelist strip: remove anything that isn't Korean Hangul, digits, or common punctuation */

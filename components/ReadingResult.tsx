@@ -11,6 +11,20 @@ function renderBold(line: string) {
   );
 }
 
+function renderLine(line: string, index: number) {
+  const trimmed = line.trim();
+  if (!trimmed) return <div key={index} className="h-1" />;
+  const isHeader = trimmed.endsWith(":") && trimmed.length < 40 && !/[.!?]/.test(trimmed);
+  if (isHeader) {
+    return (
+      <p key={index} className={`font-semibold text-sky-700 text-sm mb-1 ${index > 0 ? "mt-5 pt-3 border-t border-sky-100" : ""}`}>
+        {trimmed}
+      </p>
+    );
+  }
+  return <p key={index} className="text-sky-900 text-sm leading-relaxed mb-0.5">{renderBold(line)}</p>;
+}
+
 type Props = {
   text: string;
   loading: boolean;
@@ -61,13 +75,8 @@ const ReadingResult = forwardRef<HTMLDivElement, Props>(
             )}
 
             {text && !isError && (
-              <div className="text-sky-900 text-sm leading-relaxed whitespace-pre-wrap">
-                {text.split("\n").map((line, i, arr) => (
-                  <span key={i}>
-                    {renderBold(line)}
-                    {i < arr.length - 1 && "\n"}
-                  </span>
-                ))}
+              <div className="text-sm">
+                {text.split("\n").map((line, i) => renderLine(line, i))}
                 {loading && (
                   <span className="inline-block w-0.5 h-4 bg-sky-500 ml-0.5 animate-pulse align-middle" />
                 )}
