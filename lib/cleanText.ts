@@ -6,13 +6,13 @@ const FOREIGN_RE = /[^\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F0-9\s.,!?:;()\-""''
 /** CJK characters (Chinese / Japanese) */
 const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
-/** 반말 endings at sentence boundaries */
-const BANMAL_RE = /[가-힣](야|거야|이야|잖아|했어|겠어|하자|이라)([.?!\s]|$)/;
+/** 반말 endings at sentence boundaries (야 단독 제외 — 해야/아야/어야 오탐 방지) */
+const BANMAL_RE = /[가-힣](거야|이야|잖아|했어|겠어|하자|이라)([.?!\s]|$)/;
 
 export const CLEANUP_PROMPT = `You are a Korean text editor. Fix the following Korean text:
 1. Replace ALL foreign characters (Chinese, Japanese, Greek α β, Vietnamese đ ả, Arabic, or any non-Korean script) with natural Korean equivalents.
-2. Fix ALL speech endings to polite ~해요/~예요 style:
-   ~야 → ~예요, ~거야 → ~거예요, ~이야 → ~이에요, ~잖아 → ~잖아요,
+2. Fix ONLY these specific 반말 endings (do NOT touch ~해야/~아야/~어야/~여야 which are legitimate):
+   ~거야 → ~거예요, ~이야 → ~이에요, ~잖아 → ~잖아요,
    ~했어 → ~했어요, ~겠어 → ~겠어요, ~하자 → ~해요, ~이라 → ~이에요.
 3. Keep the same meaning and paragraph structure. No markdown.
 Output ONLY the fixed Korean text.`;
@@ -37,8 +37,7 @@ export function fixBanmal(text: string): string {
     .replace(/([가-힣])했어([.?!\s]|$)/g, "$1했어요$2")
     .replace(/([가-힣])겠어([.?!\s]|$)/g, "$1겠어요$2")
     .replace(/([가-힣])하자([.?!\s]|$)/g, "$1해요$2")
-    .replace(/([가-힣])이라([.?!\s]|$)/g, "$1이에요$2")
-    .replace(/([가-힣])야([.?!\s]|$)/g, "$1예요$2");
+    .replace(/([가-힣])이라([.?!\s]|$)/g, "$1이에요$2");
 }
 
 /** Whitelist strip: remove anything that isn't Korean Hangul, digits, or common punctuation */
