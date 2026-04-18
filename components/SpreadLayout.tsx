@@ -22,14 +22,11 @@ export default function SpreadLayout({ cards, spread, onAllRevealed, onShowDetai
 
   return (
     <div className="w-full space-y-4">
-      <div className="text-center space-y-1">
-        <p className="text-sky-700 text-sm">{spread.description}</p>
-        {revealedCount < cards.length && (
-          <p className="text-sky-500 text-xs">
-            카드를 탭하여 하나씩 공개하세요 ({revealedCount}/{cards.length})
-          </p>
-        )}
-      </div>
+      {revealedCount < cards.length && (
+        <p className="text-sky-500 text-xs text-center">
+          카드를 탭하여 하나씩 공개하세요 ({revealedCount}/{cards.length})
+        </p>
+      )}
 
       <div
         className={`flex flex-wrap justify-center gap-6 py-4 ${
