@@ -115,7 +115,12 @@ export async function POST(req: Request) {
   const body: RequestBody = await req.json();
   const { question, cards, spreadType, positions, tone = "standard", model = "llama-3.3-70b-versatile" } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
-  const ALLOWED_MODELS = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"];
+  const ALLOWED_MODELS = [
+    "llama-3.3-70b-versatile",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "mixtral-8x7b-32768",
+  ];
   const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
 
   const apiKey = process.env.GROQ_API_KEY;
