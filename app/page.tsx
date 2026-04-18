@@ -18,8 +18,9 @@ const TONES: { id: Tone; label: string; desc: string }[] = [
 ];
 
 const MODELS = [
-  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "정교한 해석" },
-  { id: "gemma2-9b-it", label: "Gemma2 9B", desc: "빠른 응답" },
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "추천" },
+  { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B", desc: "다국어 강함" },
+  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", desc: "빠름" },
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
