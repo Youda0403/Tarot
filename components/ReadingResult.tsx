@@ -2,6 +2,15 @@
 
 import { forwardRef } from "react";
 
+function renderBold(line: string) {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={i} className="font-semibold text-sky-900">{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 type Props = {
   text: string;
   loading: boolean;
@@ -53,7 +62,12 @@ const ReadingResult = forwardRef<HTMLDivElement, Props>(
 
             {text && !isError && (
               <div className="text-sky-900 text-sm leading-relaxed whitespace-pre-wrap">
-                {text}
+                {text.split("\n").map((line, i, arr) => (
+                  <span key={i}>
+                    {renderBold(line)}
+                    {i < arr.length - 1 && "\n"}
+                  </span>
+                ))}
                 {loading && (
                   <span className="inline-block w-0.5 h-4 bg-sky-500 ml-0.5 animate-pulse align-middle" />
                 )}

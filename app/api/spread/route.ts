@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { detectSpread } from "@/lib/spread";
+import { stripForeign } from "@/lib/cleanText";
 
 export const runtime = "nodejs";
 
@@ -59,12 +60,10 @@ positions array length MUST equal count. Respond ONLY with JSON.`,
 
     const type = count === 1 ? "one" : count === 5 ? "five" : "three";
 
-    return Response.json({
-      type,
-      count,
-      positions,
-      description: typeof parsed.description === "string" ? parsed.description : "",
-    });
+    const description = typeof parsed.description === "string" ? stripForeign(parsed.description) : "";
+    const cleanPositions = positions.map((p: string) => stripForeign(p));
+
+    return Response.json({ type, count, positions: cleanPositions, description });
   } catch {
     return Response.json(detectSpread(question));
   }
