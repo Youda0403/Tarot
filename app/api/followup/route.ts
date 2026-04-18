@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import type { DrawnCard } from "@/lib/tarot";
+import { needsCleanup, fixBanmal, stripForeign, CLEANUP_PROMPT } from "@/lib/cleanText";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,6 @@ type RequestBody = {
   question: string;
   model?: string;
 };
-
-const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
 const ALLOWED_MODELS = [
   "llama-3.3-70b-versatile",
@@ -60,14 +59,11 @@ export async function POST(req: Request) {
 
     let text = completion.choices[0]?.message?.content ?? "";
 
-    if (CJK_RE.test(text) || /[A-Za-z]{5,}/.test(text)) {
+    if (needsCleanup(text)) {
       const cleaned = await groq.chat.completions.create({
         model: resolvedModel,
         messages: [
-          {
-            role: "system",
-            content: "Rewrite in pure Korean (한글) only. Keep meaning. No markdown. ~해요 endings.",
-          },
+          { role: "system", content: CLEANUP_PROMPT },
           { role: "user", content: text },
         ],
         stream: false,
@@ -77,10 +73,8 @@ export async function POST(req: Request) {
       text = cleaned.choices[0]?.message?.content ?? text;
     }
 
-    text = text
-      .replace(/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]+/g, "")
-      .replace(/ {2,}/g, " ")
-      .trim();
+    text = fixBanmal(text);
+    text = stripForeign(text);
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

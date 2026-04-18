@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { type DrawnCard, type SpreadType, SPREADS } from "@/lib/tarot";
+import { needsCleanup, fixBanmal, stripForeign, CLEANUP_PROMPT } from "@/lib/cleanText";
 
 export const runtime = "nodejs";
 
@@ -41,18 +42,6 @@ READING STRUCTURE (CRITICAL — read carefully):
 FORBIDDEN: vague phrases like "에너지가 흐르다", "우주의 뜻", "내면의 목소리", "흐름에 맡기다", "빛이 비추다". Every sentence must be grounded in the questioner's actual situation.
 REQUIRED: acknowledge real difficulty honestly before offering direction. Do not only reassure.`;
 
-const CLEANUP_PROMPT = `You are a Korean text editor. The text below is a Korean tarot reading that may contain Chinese characters (漢字) or English words mixed in by mistake.
-
-Rewrite it in pure Korean (한글) only. Rules:
-- Replace any Chinese/Japanese characters or English words with natural Korean equivalents.
-- Keep the same meaning and paragraph structure.
-- Keep section headers like "각 카드 해석:", "종합 메시지:", "지금 당신에게 필요한 것:".
-- Speech style: EVERY sentence must end with ~해요/~예요/~아요/~어요. NEVER use 반말 (~야, ~거야, ~해, ~잖아, ~이야). Not even once.
-- No markdown.
-Output ONLY the rewritten Korean text.`;
-
-const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
-
 function buildMessages(question: string, cards: DrawnCard[], positions: string[], tone: Tone) {
   // Only use Korean card name (nameko) — no English name to avoid code-switching
   const cardLines = cards
@@ -87,13 +76,6 @@ ${cardLines}
     { role: "system" as const, content: SYSTEM_PROMPT },
     { role: "user" as const, content: userContent },
   ];
-}
-
-function needsCleanup(text: string): boolean {
-  if (CJK_RE.test(text)) return true;
-  // Check for English words longer than 4 chars (card names in parens already excluded by not using them)
-  if (/[A-Za-z]{5,}/.test(text)) return true;
-  return false;
 }
 
 function streamText(text: string, encoder: TextEncoder): ReadableStream {
@@ -166,12 +148,10 @@ export async function POST(req: Request) {
         finalText = cleaned.choices[0]?.message?.content ?? finalText;
       }
 
-      // Step 3: Final safety strip of any remaining CJK
-      finalText = finalText
-        .replace(/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]+/g, "")
-        .replace(/\(\s*\)/g, "")
-        .replace(/ {2,}/g, " ")
-        .trim();
+      // Step 3: Final safety — fix 반말 endings, strip foreign chars
+      finalText = fixBanmal(finalText);
+      finalText = stripForeign(finalText);
+      finalText = finalText.replace(/\(\s*\)/g, "").trim();
 
       return new Response(streamText(finalText, encoder), {
         headers: {

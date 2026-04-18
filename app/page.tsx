@@ -334,7 +334,9 @@ export default function Home() {
               {spread.count}장 스프레드
             </span>
             {spread.description && (
-              <p className="text-sky-600 text-xs">{spread.description}</p>
+              <p className="text-sky-600 text-xs text-center">
+                {spread.description}{!spread.description.endsWith(".") ? "." : ""}
+              </p>
             )}
           </div>
 
