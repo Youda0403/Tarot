@@ -4,9 +4,12 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import QuestionForm from "@/components/QuestionForm";
 import SpreadLayout from "@/components/SpreadLayout";
 import ReadingResult from "@/components/ReadingResult";
-import { drawCards, type DrawnCard, type SpreadInfo } from "@/lib/tarot";
+import CardDetailModal from "@/components/CardDetailModal";
+import FollowUpModal from "@/components/FollowUpModal";
+import ReadingHistory from "@/components/ReadingHistory";
+import { drawCards, type DrawnCard, type SpreadInfo, type SpreadType } from "@/lib/tarot";
 import { detectSpread } from "@/lib/spread";
-import type { SpreadType } from "@/lib/tarot";
+import { saveReading } from "@/lib/history";
 
 type Stage = "input" | "cards" | "reading";
 export type Tone = "soft" | "standard" | "sharp";
@@ -24,6 +27,25 @@ const MODELS = [
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
+type SpreadOverride = "auto" | 1 | 3 | 5;
+
+function getFixedSpread(count: 1 | 3 | 5): SpreadInfo {
+  if (count === 1)
+    return { type: "one", count: 1, positions: ["오늘의 메시지"], description: "핵심 메시지 한 장으로." };
+  if (count === 5)
+    return {
+      type: "five",
+      count: 5,
+      positions: ["현재 상황", "장애물", "내면의 목소리", "가능한 결과", "핵심 조언"],
+      description: "5가지 관점으로 깊게.",
+    };
+  return {
+    type: "three",
+    count: 3,
+    positions: ["과거의 영향", "현재 에너지", "미래의 가능성"],
+    description: "흐름을 3장으로.",
+  };
+}
 
 export default function Home() {
   const [stage, setStage] = useState<Stage>("input");
@@ -37,16 +59,20 @@ export default function Home() {
   const [savingImage, setSavingImage] = useState(false);
   const [tone, setTone] = useState<Tone>("standard");
   const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
+  const [spreadOverride, setSpreadOverride] = useState<SpreadOverride>("auto");
+  const [historyKey, setHistoryKey] = useState(0);
+
+  // Card detail modal
+  const [detailTarget, setDetailTarget] = useState<{ card: DrawnCard; position: string } | null>(null);
+  // Follow-up modal
+  const [followUpTarget, setFollowUpTarget] = useState<{ card: DrawnCard; position: string } | null>(null);
+
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Push a history entry when leaving input, so browser back brings user back here
   useEffect(() => {
-    if (stage !== "input") {
-      history.pushState({ stage }, "");
-    }
+    if (stage !== "input") history.pushState({ stage }, "");
   }, [stage]);
 
-  // Browser back button → return to input (keep question/tone/model)
   useEffect(() => {
     const handlePopState = () => {
       setStage("input");
@@ -71,31 +97,36 @@ export default function Home() {
 
   const handleQuestionSubmit = async (q: string) => {
     setQuestion(q);
-    setLoadingSpread(true);
     setReadingText("");
 
     let chosenSpread: SpreadInfo;
-    try {
-      const res = await fetch("/api/spread", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
-      });
-      if (!res.ok) throw new Error("spread API failed");
-      const data = await res.json();
-      chosenSpread = {
-        type: (data.type ?? "three") as SpreadType,
-        count: data.count,
-        positions: data.positions,
-        description: data.description ?? "",
-      };
-    } catch {
-      chosenSpread = detectSpread(q);
+
+    if (spreadOverride !== "auto") {
+      chosenSpread = getFixedSpread(spreadOverride);
+    } else {
+      setLoadingSpread(true);
+      try {
+        const res = await fetch("/api/spread", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: q }),
+        });
+        if (!res.ok) throw new Error("spread API failed");
+        const data = await res.json();
+        chosenSpread = {
+          type: (data.type ?? "three") as SpreadType,
+          count: data.count,
+          positions: data.positions,
+          description: data.description ?? "",
+        };
+      } catch {
+        chosenSpread = detectSpread(q);
+      }
+      setLoadingSpread(false);
     }
 
     setSpread(chosenSpread);
     setCards(drawCards(chosenSpread.count));
-    setLoadingSpread(false);
     setStage("cards");
   };
 
@@ -133,9 +164,16 @@ export default function Home() {
         setReadingText(text);
       }
 
-      if (text.includes('"code":503') || text.includes("UNAVAILABLE") || text.includes('"status":"Service Unavailable"')) {
+      if (
+        text.includes('"code":503') ||
+        text.includes("UNAVAILABLE") ||
+        text.includes('"status":"Service Unavailable"')
+      ) {
         setReadingText("");
         setIsError(true);
+      } else if (text && spread) {
+        saveReading({ question, spread, cards, readingText: text });
+        setHistoryKey((k) => k + 1);
       }
     } catch {
       setIsError(true);
@@ -183,9 +221,7 @@ export default function Home() {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-sky-700 via-ocean-500 to-sky-700 bg-clip-text text-transparent">
           ✨ 타로 리딩
         </h1>
-        <p className="text-sky-600 text-sm">
-          별자리와 카드가 당신의 이야기를 들려드립니다
-        </p>
+        <p className="text-sky-600 text-sm">별자리와 카드가 당신의 이야기를 들려드립니다</p>
       </header>
 
       {stage === "input" && (
@@ -214,7 +250,7 @@ export default function Home() {
           {/* Model selector */}
           <div className="w-full max-w-xl space-y-2">
             <p className="text-sky-600 text-xs text-center font-medium">AI 모델</p>
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               {MODELS.map((m) => (
                 <button
                   key={m.id}
@@ -228,6 +264,26 @@ export default function Home() {
                 >
                   {m.label}
                   <span className="ml-1.5 opacity-70">{m.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Spread override */}
+          <div className="w-full max-w-xl space-y-2">
+            <p className="text-sky-600 text-xs text-center font-medium">스프레드</p>
+            <div className="flex gap-2 justify-center">
+              {(["auto", 1, 3, 5] as SpreadOverride[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSpreadOverride(v)}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                    spreadOverride === v
+                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
+                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
+                  }`}
+                >
+                  {v === "auto" ? "AI 자동" : `${v}장`}
                 </button>
               ))}
             </div>
@@ -251,6 +307,8 @@ export default function Home() {
               <QuestionForm onSubmit={handleQuestionSubmit} loading={false} />
             )}
           </div>
+
+          <ReadingHistory key={historyKey} />
         </>
       )}
 
@@ -280,9 +338,14 @@ export default function Home() {
             )}
           </div>
 
-          <SpreadLayout cards={cards} spread={spread} onAllRevealed={handleAllRevealed} />
+          <SpreadLayout
+            cards={cards}
+            spread={spread}
+            onAllRevealed={handleAllRevealed}
+            onShowDetail={(card, position) => setDetailTarget({ card, position })}
+          />
 
-          {/* Result — only this section is saved as image */}
+          {/* Result */}
           {stage === "reading" && (
             <ReadingResult
               ref={resultRef}
@@ -291,6 +354,25 @@ export default function Home() {
               isError={isError}
               onRetry={handleAllRevealed}
             />
+          )}
+
+          {/* Follow-up per card */}
+          {stage === "reading" && !loadingReading && readingText && (
+            <div className="space-y-3">
+              <p className="text-sky-600 text-xs text-center">카드에 대해 더 알고 싶다면</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {cards.map((card, i) => (
+                  <button
+                    key={card.id}
+                    onClick={() => setFollowUpTarget({ card, position: spread.positions[i] })}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/60 border border-sky-300 text-sky-700 text-xs hover:bg-white/80 transition-colors"
+                  >
+                    <span>{card.image}</span>
+                    <span>{card.nameko}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Buttons */}
@@ -312,6 +394,24 @@ export default function Home() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Modals */}
+      {detailTarget && (
+        <CardDetailModal
+          card={detailTarget.card}
+          position={detailTarget.position}
+          onClose={() => setDetailTarget(null)}
+        />
+      )}
+      {followUpTarget && (
+        <FollowUpModal
+          card={followUpTarget.card}
+          position={followUpTarget.position}
+          question={question}
+          model={model}
+          onClose={() => setFollowUpTarget(null)}
+        />
       )}
     </main>
   );

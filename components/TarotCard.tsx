@@ -9,9 +9,10 @@ type Props = {
   index: number;
   revealed: boolean;
   onReveal: () => void;
+  onShowDetail?: () => void;
 };
 
-export default function TarotCard({ card, position, index, revealed, onReveal }: Props) {
+export default function TarotCard({ card, position, index, revealed, onReveal, onShowDetail }: Props) {
   const [flipped, setFlipped] = useState(false);
 
   const handleClick = () => {
@@ -78,7 +79,16 @@ export default function TarotCard({ card, position, index, revealed, onReveal }:
           </div>
         </div>
 
-        {!flipped && (
+        {flipped ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onShowDetail?.(); }}
+            className="absolute -bottom-6 inset-x-0 flex justify-center"
+          >
+            <span className="text-sky-500 text-[10px] hover:text-sky-700 transition-colors">
+              📖 상세
+            </span>
+          </button>
+        ) : (
           <div className="absolute -bottom-5 inset-x-0 flex justify-center">
             <span className="text-sky-600 text-[10px]">탭하여 공개</span>
           </div>

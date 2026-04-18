@@ -8,9 +8,10 @@ type Props = {
   cards: DrawnCard[];
   spread: SpreadInfo;
   onAllRevealed: () => void;
+  onShowDetail: (card: DrawnCard, position: string) => void;
 };
 
-export default function SpreadLayout({ cards, spread, onAllRevealed }: Props) {
+export default function SpreadLayout({ cards, spread, onAllRevealed, onShowDetail }: Props) {
   const [revealedCount, setRevealedCount] = useState(0);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function SpreadLayout({ cards, spread, onAllRevealed }: Props) {
             index={i}
             revealed={i < revealedCount}
             onReveal={() => setRevealedCount((c) => Math.max(c, i + 1))}
+            onShowDetail={() => onShowDetail(card, spread.positions[i])}
           />
         ))}
       </div>
