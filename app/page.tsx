@@ -21,8 +21,8 @@ const TONES: { id: Tone; label: string; desc: string }[] = [
 ];
 
 const MODELS = [
-  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "안정적" },
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "빠름·여유" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "간결·명료 (추천)" },
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "풍부하지만 장황할 수 있음" },
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
@@ -57,7 +57,7 @@ export default function Home() {
   const [isError, setIsError] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
   const [tone, setTone] = useState<Tone>("standard");
-  const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
+  const [model, setModel] = useState<ModelId>("meta-llama/llama-4-scout-17b-16e-instruct");
   const [spreadOverride, setSpreadOverride] = useState<SpreadOverride>("auto");
   const [historyKey, setHistoryKey] = useState(0);
 

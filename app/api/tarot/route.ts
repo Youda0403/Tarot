@@ -104,7 +104,7 @@ function streamText(text: string, encoder: TextEncoder): ReadableStream {
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType, positions, tone = "standard", model = "llama-3.3-70b-versatile" } = body;
+  const { question, cards, spreadType, positions, tone = "standard", model = "meta-llama/llama-4-scout-17b-16e-instruct" } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
   const ALLOWED_MODELS = [
     "llama-3.3-70b-versatile",

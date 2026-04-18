@@ -17,7 +17,7 @@ const ALLOWED_MODELS = [
 ];
 
 export async function POST(req: Request) {
-  const { card, position, question, model = "llama-3.3-70b-versatile" }: RequestBody = await req.json();
+  const { card, position, question, model = "meta-llama/llama-4-scout-17b-16e-instruct" }: RequestBody = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return new Response(JSON.stringify({ status: "no key" }), { status: 500 });
