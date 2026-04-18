@@ -119,7 +119,6 @@ export async function POST(req: Request) {
     "llama-3.3-70b-versatile",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
     "meta-llama/llama-4-scout-17b-16e-instruct",
-    "mixtral-8x7b-32768",
   ];
   const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
 

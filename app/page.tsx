@@ -21,7 +21,6 @@ const MODELS = [
   { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "안정적" },
   { id: "meta-llama/llama-4-maverick-17b-128e-instruct", label: "Llama 4 Maverick", desc: "다국어 강함" },
   { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "빠름·여유" },
-  { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B", desc: "대안" },
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
