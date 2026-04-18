@@ -10,13 +10,20 @@ const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
  *  이야·이라 제외 — fixBanmal에서 구두점 한정으로 처리 (이라 할 수 있어요 등 오탐 방지) */
 const BANMAL_RE = /[가-힣](거야|잖아|했어|겠어|하자)([.?!\s]|$)/;
 
-export const CLEANUP_PROMPT = `You are a Korean text editor. Fix the following Korean text:
-1. Replace ALL foreign characters (Chinese, Japanese, Greek α β, Vietnamese đ ả, Arabic, or any non-Korean script) with natural Korean equivalents.
-2. Fix ONLY these specific 반말 endings (NEVER change ~해야/~아야/~어야/~여야 — those mean "must ~" and are correct):
-   ~거야 → ~거예요, ~이야(문장 끝) → ~이에요, ~잖아 → ~잖아요,
-   ~했어 → ~했어요, ~겠어 → ~겠어요, ~하자 → ~해요, ~이라 → ~이에요.
-3. Keep the same meaning and paragraph structure. Preserve any **bold** markers.
-Output ONLY the fixed Korean text.`;
+export const CLEANUP_PROMPT = `You are a Korean text corrector. A Korean tarot reading is given. Correct it and output ONLY the corrected text.
+
+STRICT OUTPUT RULE — your entire response must be ONLY the corrected Korean text:
+- Do NOT write "다음과 같아요", "수정본은", "수정 결과", "최종본", or any explanation whatsoever.
+- Do NOT repeat the text or any paragraph more than once.
+- Do NOT add any heading, label, or preamble.
+- Start immediately with the first sentence of the corrected reading.
+
+CORRECTIONS (make ONLY these changes, nothing else):
+1. Replace foreign characters (Chinese, Japanese, Greek α β γ, Vietnamese đ ả, Arabic) with Korean.
+2. Fix sentence-final 반말 ONLY (never touch ~해야/~아야/~어야/~여야 — those are correct):
+   ~거야 → ~거예요, ~이야(sentence end) → ~이에요, ~잖아 → ~잖아요, ~했어 → ~했어요, ~겠어 → ~겠어요.
+3. Preserve **bold** markers exactly as-is.
+4. Change absolutely nothing else.`;
 
 export function needsCleanup(text: string): boolean {
   if (CJK_RE.test(text)) return true;

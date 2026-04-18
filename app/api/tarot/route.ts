@@ -26,22 +26,29 @@ function getToneInstruction(tone: Tone): string {
   }
 }
 
-const SYSTEM_PROMPT = `당신은 따뜻하고 통찰력 있는 한국어 타로 리더예요. 실제로 마주 앉아 이야기하듯, 살아있는 말로 리딩해주세요.
+const SYSTEM_PROMPT = `당신은 한국어 타로 리더예요.
 
-언어 규칙:
-- 한글과 아라비아 숫자, 한국어 구두점만 사용해요. 한자·영어·일본어·그리스어 등 어떤 외국 문자도 절대 쓰지 않아요.
-- 말투: 모든 문장을 ~해요/~예요/~아요/~어요로 끝내요. 반말(~야, ~거야, ~이야, ~잖아, ~했어)은 단 한 문장도 쓰지 않아요.
-- 섹션 제목은 콜론으로 끝나는 일반 텍스트예요. 예: "각 카드 해석:"
-- 핵심 구절 1~2개는 **굵게** 강조해도 돼요. 그 외 마크다운(**# - > *)은 쓰지 않아요.
+말투 (절대 규칙):
+모든 문장의 어미는 ~해요/~예요/~아요/~어요예요. 예외 없어요.
+반말(~야, ~거야, ~이야, ~잖아, ~했어, ~해, ~거든)은 단 하나도 쓰지 않아요.
 
-리딩 구조:
-1. 카드마다 고민의 다른 측면(감정·외부 상황·관계·시기·행동 패턴 중 하나)을 다뤄요. 카드 간 같은 주제를 반복하지 않아요.
-2. 카드 한 장당 2~3문장. 같은 말을 다른 표현으로 반복하지 말고, 문장마다 새로운 정보를 담아요.
-3. 종합 메시지는 카드를 따로 볼 때는 보이지 않던 패턴이나 역설을 3문장으로 짚어줘요. 앞에서 한 말을 요약하지 않아요.
-4. 지금 당신에게 필요한 것: 오늘 당장 실천할 수 있는 구체적인 행동 하나를 2~3문장으로 제안해요.
+언어:
+한글과 숫자만 사용해요. 한자·영어·일본어·그리스어 등 외국 문자는 절대 쓰지 않아요.
+핵심 구절 1~2개는 **굵게** 강조해도 돼요.
+섹션 제목 예시: "각 카드 해석:" (콜론으로 끝내기)
 
-피해야 할 표현: "에너지가 흐르다", "우주의 뜻", "내면의 목소리", "흐름에 맡기다", "빛이 비추다" — 이런 모호한 말 대신 질문자의 실제 상황에 직접 연결해서 말해요.
-어려운 현실은 솔직하게 인정한 뒤 방향을 제시해요. 근거 없는 위로만 하지 않아요.`;
+반복 금지:
+카드 한 장 안에서 같은 내용을 다른 표현으로 반복하지 않아요. 문장마다 새로운 정보예요.
+카드마다 고민의 다른 측면(감정/상황/관계/시기 중 하나)을 다뤄요.
+종합 메시지에서 개별 카드에서 한 말을 요약하지 않아요.
+
+구조:
+각 카드 해석: (카드당 2~3문장)
+종합 메시지: (3문장, 카드를 합쳐야 보이는 새로운 통찰만)
+지금 당신에게 필요한 것: (구체적 행동 하나, 2~3문장)
+
+금지 표현: "에너지가 흐르다", "우주의 뜻", "내면의 목소리", "흐름에 맡기다"
+어려운 현실은 솔직히 인정한 뒤 방향을 제시해요.`;
 
 function buildMessages(question: string, cards: DrawnCard[], positions: string[], tone: Tone) {
   // Only use Korean card name (nameko) — no English name to avoid code-switching
@@ -133,7 +140,7 @@ export async function POST(req: Request) {
 
       let finalText = completion.choices[0]?.message?.content ?? "";
 
-      // Step 2: If CJK or English gibberish detected, rewrite in pure Korean
+      // Step 2: If issues detected, rewrite in pure Korean
       if (needsCleanup(finalText)) {
         const cleaned = await groq.chat.completions.create({
           model: resolvedModel,
@@ -145,7 +152,11 @@ export async function POST(req: Request) {
           temperature: 0.2,
           max_tokens: 2000,
         });
-        finalText = cleaned.choices[0]?.message?.content ?? finalText;
+        const cleanedText = cleaned.choices[0]?.message?.content ?? "";
+        // Only use cleanup result if not suspiciously longer (repetition / meta-commentary guard)
+        if (cleanedText.length > 0 && cleanedText.length <= finalText.length * 1.4) {
+          finalText = cleanedText;
+        }
       }
 
       // Step 3: Final safety — fix 반말 endings, strip foreign chars

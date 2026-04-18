@@ -69,7 +69,10 @@ export async function POST(req: Request) {
         temperature: 0.2,
         max_tokens: 600,
       });
-      text = cleaned.choices[0]?.message?.content ?? text;
+      const cleanedText = cleaned.choices[0]?.message?.content ?? "";
+      if (cleanedText.length > 0 && cleanedText.length <= text.length * 1.4) {
+        text = cleanedText;
+      }
     }
 
     text = fixBanmal(text);
