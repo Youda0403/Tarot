@@ -15,18 +15,22 @@ type RequestBody = {
   model?: string;
 };
 
-function getToneInstruction(tone: Tone): string {
-  switch (tone) {
-    case "soft":
-      return "따뜻하고 포근한 말투로, 상대방을 감싸안듯 위로하며 희망과 용기를 전해주세요.";
-    case "sharp":
-      return "직관적이고 핵심을 꿰뚫는 말투로, 군더더기 없이 본질적인 메시지를 전달해주세요.";
-    default:
-      return "균형 잡힌 전문적인 말투로, 객관적이면서도 공감 어린 시각으로 카드를 해석해주세요.";
-  }
-}
+function buildSystemPrompt(tone: Tone): string {
+  const toneSection = {
+    soft: `리딩 스타일:
+따뜻하고 포근하게 이야기해요. 질문자의 불안과 아픔을 먼저 충분히 인정한 뒤 방향을 제시해요.
+희망적인 면을 강조하되 현실을 외면하지 않아요. 문장이 감싸 안는 느낌이어야 해요.`,
+    standard: `리딩 스타일:
+균형 잡힌 시각으로 이야기해요. 공감하되 객관적으로, 솔직하되 배려 있게 전달해요.
+어려운 현실은 인정하고 가능성도 함께 짚어줘요.`,
+    sharp: `리딩 스타일:
+핵심만 직접적으로 말해요. 감정적 완충 없이 본질적인 메시지를 먼저 던져요.
+질문자가 회피하고 있는 것을 정확히 짚고, 행동 방향을 명확하게 제시해요. 불필요한 위로나 쿠션 없이 솔직하게요.`,
+  }[tone];
 
-const SYSTEM_PROMPT = `당신은 한국어 타로 리더예요.
+  return `당신은 한국어 타로 리더예요.
+
+${toneSection}
 
 말투 (절대 규칙):
 모든 문장의 어미는 ~해요/~예요/~아요/~어요예요. 예외 없어요.
@@ -47,8 +51,8 @@ const SYSTEM_PROMPT = `당신은 한국어 타로 리더예요.
 종합 메시지: (4~5문장. 카드를 합쳐야 보이는 새로운 통찰 — 질문자가 지금 어떤 지점에 서 있는지, 왜 이 상황이 생겼는지, 어느 방향으로 가야 하는지를 구체적으로 짚어줘요. 앞에서 한 말의 요약이 아니라 전체 그림을 본 뒤에만 나올 수 있는 말이어야 해요.)
 지금 당신에게 필요한 것: (구체적 행동 하나, 2~3문장)
 
-금지 표현: "에너지가 흐르다", "우주의 뜻", "내면의 목소리", "흐름에 맡기다"
-어려운 현실은 솔직히 인정한 뒤 방향을 제시해요.`;
+금지 표현: "에너지가 흐르다", "우주의 뜻", "내면의 목소리", "흐름에 맡기다"`;
+}
 
 function buildMessages(question: string, cards: DrawnCard[], positions: string[], tone: Tone) {
   // Only use Korean card name (nameko) — no English name to avoid code-switching
@@ -60,11 +64,7 @@ function buildMessages(question: string, cards: DrawnCard[], positions: string[]
     })
     .join("\n\n");
 
-  const toneInstruction = getToneInstruction(tone);
-
-  const userContent = `말투: ${toneInstruction}
-
-질문자의 고민: "${question}"
+  const userContent = `질문자의 고민: "${question}"
 
 뽑힌 카드:
 ${cardLines}
@@ -81,7 +81,7 @@ ${cardLines}
 오늘 당장 실천할 수 있는 구체적인 행동 하나를 2~3문장으로 제안해요. 왜 그 행동이 지금 필요한지 간단히 설명해도 좋아요.`;
 
   return [
-    { role: "system" as const, content: SYSTEM_PROMPT },
+    { role: "system" as const, content: buildSystemPrompt(tone) },
     { role: "user" as const, content: userContent },
   ];
 }
