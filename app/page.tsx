@@ -21,8 +21,8 @@ const TONES: { id: Tone; label: string; desc: string }[] = [
 ];
 
 const MODELS = [
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "간결·명료 (추천)" },
-  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "풍부하지만 장황할 수 있음" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "추천" },
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "" },
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
@@ -262,7 +262,7 @@ export default function Home() {
                   }`}
                 >
                   {m.label}
-                  <span className="ml-1.5 opacity-70">{m.desc}</span>
+                  {m.desc && <span className="ml-1.5 opacity-70">{m.desc}</span>}
                 </button>
               ))}
             </div>

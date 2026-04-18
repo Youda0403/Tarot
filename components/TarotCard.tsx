@@ -14,13 +14,11 @@ type Props = {
 
 export default function TarotCard({ card, position, index, revealed, onReveal, onShowDetail }: Props) {
   const [flipped, setFlipped] = useState(false);
-  const [popped, setPopped] = useState(false);
 
   const handleClick = () => {
     if (!flipped) {
       setFlipped(true);
       setTimeout(onReveal, 300);
-      setTimeout(() => setPopped(true), 700);
     }
   };
 
@@ -35,12 +33,10 @@ export default function TarotCard({ card, position, index, revealed, onReveal, o
         onClick={handleClick}
       >
         <div
-          className="relative w-full h-full"
+          className="relative w-full h-full transition-transform duration-700"
           style={{
             transformStyle: "preserve-3d",
             transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            transition: popped ? "none" : "transform 0.7s ease-in-out",
-            animation: popped ? "card-reveal 0.35s ease-out" : undefined,
           }}
         >
           {/* Card back */}
