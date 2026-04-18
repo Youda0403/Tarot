@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import QuestionForm from "@/components/QuestionForm";
 import SpreadLayout from "@/components/SpreadLayout";
 import ReadingResult from "@/components/ReadingResult";
@@ -20,7 +20,6 @@ const TONES: { id: Tone; label: string; desc: string }[] = [
 const MODELS = [
   { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "추천" },
   { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B", desc: "다국어 강함" },
-  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", desc: "빠름" },
 ] as const;
 
 type ModelId = (typeof MODELS)[number]["id"];
@@ -38,6 +37,36 @@ export default function Home() {
   const [tone, setTone] = useState<Tone>("standard");
   const [model, setModel] = useState<ModelId>("llama-3.3-70b-versatile");
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Push a history entry when leaving input, so browser back brings user back here
+  useEffect(() => {
+    if (stage !== "input") {
+      history.pushState({ stage }, "");
+    }
+  }, [stage]);
+
+  // Browser back button → return to input (keep question/tone/model)
+  useEffect(() => {
+    const handlePopState = () => {
+      setStage("input");
+      setCards([]);
+      setSpread(null);
+      setReadingText("");
+      setLoadingReading(false);
+      setIsError(false);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleBack = () => {
+    setStage("input");
+    setCards([]);
+    setSpread(null);
+    setReadingText("");
+    setLoadingReading(false);
+    setIsError(false);
+  };
 
   const handleQuestionSubmit = async (q: string) => {
     setQuestion(q);
@@ -226,6 +255,14 @@ export default function Home() {
 
       {(stage === "cards" || stage === "reading") && spread && (
         <div className="w-full max-w-2xl space-y-8">
+          {/* Back button */}
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1.5 text-sky-600 text-sm hover:text-sky-800 transition-colors"
+          >
+            ← 뒤로 (모델/톤 변경)
+          </button>
+
           {/* Question recap */}
           <div className="text-center bg-white/50 border border-sky-300/60 rounded-2xl px-5 py-3">
             <p className="text-sky-600 text-xs mb-1">질문</p>

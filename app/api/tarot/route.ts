@@ -80,7 +80,7 @@ ${cardLines}
 개별 카드 해석에서 하지 않은 말을 해요. 카드 전체를 함께 봤을 때만 보이는 패턴이나 역설, 핵심 통찰을 3문장으로 전달해요. 질문자가 지금 어디에 서 있고 어느 방향으로 가야 하는지 명확하게 말해요.
 
 지금 당신에게 필요한 것:
-한 문장. 오늘 할 수 있는 행동 하나만.`;
+오늘 당장 실천할 수 있는 구체적인 행동 하나를 2~3문장으로 제안해요. 왜 그 행동이 지금 필요한지 간단히 설명해도 좋아요.`;
 
   return [
     { role: "system" as const, content: SYSTEM_PROMPT },
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   const body: RequestBody = await req.json();
   const { question, cards, spreadType, positions, tone = "standard", model = "llama-3.3-70b-versatile" } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
-  const ALLOWED_MODELS = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "llama-3.1-8b-instant"];
+  const ALLOWED_MODELS = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"];
   const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
 
   const apiKey = process.env.GROQ_API_KEY;
