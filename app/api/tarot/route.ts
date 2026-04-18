@@ -17,37 +17,40 @@ type RequestBody = {
 function getToneInstruction(tone: Tone): string {
   switch (tone) {
     case "soft":
-      return "따뜻하고 포근한 말투로, 상대방을 감싸안듯 위로하며 희망과 용기를 전해주세요. 부드럽고 다정한 표현을 사용해요.";
+      return "따뜻하고 포근한 말투로, 상대방을 감싸안듯 위로하며 희망과 용기를 전해주세요.";
     case "sharp":
-      return "직관적이고 핵심을 꿰뚫는 말투로, 군더더기 없이 본질적인 메시지를 전달해주세요. 강렬하고 인상적인 표현을 사용해요.";
+      return "직관적이고 핵심을 꿰뚫는 말투로, 군더더기 없이 본질적인 메시지를 전달해주세요.";
     default:
       return "균형 잡힌 전문적인 말투로, 객관적이면서도 공감 어린 시각으로 카드를 해석해주세요.";
   }
 }
 
-const SYSTEM_PROMPT = `You are an expert tarot reader with 20 years of experience. You MUST follow these rules without exception:
+const SYSTEM_PROMPT = `You are a Korean tarot reader. Respond ONLY in Korean (한글). Rules:
+- Use ONLY Korean Hangul, Korean punctuation, and Arabic numerals. Zero exceptions.
+- Do NOT write any Chinese characters, Japanese characters, English words, or any non-Korean script.
+- Do NOT use markdown (no **, *, #, -, >).
+- Speech style: ~해요 / ~예요 / ~아요/어요 endings throughout.
+- Section headers: plain text ending with colon, e.g. "각 카드 해석:"`;
 
-LANGUAGE RULES (CRITICAL):
-- Write ONLY in Korean (한국어). Do NOT use any Chinese characters (漢字), Japanese hiragana, katakana, or any CJK characters under any circumstances.
-- Do NOT mix in any English words, Latin phrases, or foreign language terms.
-- Use ONLY Korean Hangul (가-힣), standard Korean punctuation, and Arabic numerals.
-- Card names in English (in parentheses) are the only exception.
+const CLEANUP_PROMPT = `You are a Korean text editor. The text below is a Korean tarot reading that may contain Chinese characters (漢字) or English words mixed in by mistake.
 
-FORMAT RULES (CRITICAL):
-- Do NOT use any markdown: no **, no *, no #, no >, no - bullet points, no backticks.
-- Section headers must use plain text with a colon only (e.g. "각 카드 해석:").
-- Use natural paragraph breaks with blank lines between sections.
+Rewrite it in pure Korean (한글) only. Rules:
+- Replace any Chinese/Japanese characters or English words with natural Korean equivalents.
+- Keep the same meaning and paragraph structure.
+- Keep section headers like "각 카드 해석:", "종합 메시지:", "지금 당신에게 필요한 것:".
+- Speech style: ~해요 / ~예요 endings.
+- No markdown.
+Output ONLY the rewritten Korean text.`;
 
-SPEECH STYLE:
-- Always use polite Korean ending style: ~해요, ~예요, ~이에요, ~아요/어요.
-- Never use formal ~합니다 style or casual 반말.`;
+const CJK_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
 function buildMessages(question: string, cards: DrawnCard[], positions: string[], tone: Tone) {
+  // Only use Korean card name (nameko) — no English name to avoid code-switching
   const cardLines = cards
     .map((card, i) => {
       const direction = card.isReversed ? "역방향" : "정방향";
       const meaning = card.isReversed ? card.reversedMeaning : card.upright;
-      return `[${positions[i]}] ${card.nameko} (${card.name}) — ${direction}\n  의미: ${meaning}\n  키워드: ${card.keywords.join(", ")}`;
+      return `[${positions[i]}] ${card.nameko} — ${direction}\n  의미: ${meaning}`;
     })
     .join("\n\n");
 
@@ -60,23 +63,44 @@ function buildMessages(question: string, cards: DrawnCard[], positions: string[]
 뽑힌 카드:
 ${cardLines}
 
-아래 구조로 타로 리딩을 작성해요. 반드시 순수 한국어(한글)로만, 마크다운 없이 작성해요.
+아래 형식으로 타로 리딩을 작성해요.
 
 각 카드 해석:
-각 카드의 위치 의미와 카드의 메시지를 연결하여 2~3문장씩 해석해요.
+각 카드의 위치 의미와 메시지를 연결하여 2~3문장씩 해석해요.
 
 종합 메시지:
-카드 전체가 전하는 핵심 흐름과 조언을 3~4문장으로 정리해요.
+카드 전체가 전하는 흐름과 핵심 조언을 3~4문장으로 정리해요.
 
 지금 당신에게 필요한 것:
-지금 바로 실천할 수 있는 구체적인 행동이나 마음가짐 한 가지를 제안해요.
-
-부정적인 예언은 하지 않아요. 역방향 카드도 성장과 변화의 기회로 해석해요.`;
+지금 바로 실천할 수 있는 행동이나 마음가짐 한 가지를 제안해요.`;
 
   return [
     { role: "system" as const, content: SYSTEM_PROMPT },
     { role: "user" as const, content: userContent },
   ];
+}
+
+function needsCleanup(text: string): boolean {
+  if (CJK_RE.test(text)) return true;
+  // Check for English words longer than 4 chars (card names in parens already excluded by not using them)
+  if (/[A-Za-z]{5,}/.test(text)) return true;
+  return false;
+}
+
+function streamText(text: string, encoder: TextEncoder): ReadableStream {
+  return new ReadableStream({
+    async start(controller) {
+      const CHUNK = 15;
+      const DELAY = 10;
+      for (let i = 0; i < text.length; i += CHUNK) {
+        controller.enqueue(encoder.encode(text.slice(i, i + CHUNK)));
+        if (i + CHUNK < text.length) {
+          await new Promise((r) => setTimeout(r, DELAY));
+        }
+      }
+      controller.close();
+    },
+  });
 }
 
 export async function POST(req: Request) {
@@ -97,7 +121,6 @@ export async function POST(req: Request) {
 
   const groq = new Groq({ apiKey });
   const messages = buildMessages(question, cards, resolvedPositions, tone);
-
   const encoder = new TextEncoder();
   let attempt = 0;
   const maxAttempts = 3;
@@ -105,6 +128,7 @@ export async function POST(req: Request) {
   while (attempt < maxAttempts) {
     attempt++;
     try {
+      // Step 1: Generate reading
       const completion = await groq.chat.completions.create({
         model: resolvedModel,
         messages,
@@ -113,31 +137,31 @@ export async function POST(req: Request) {
         max_tokens: 1800,
       });
 
-      const rawText = completion.choices[0]?.message?.content ?? "";
+      let finalText = completion.choices[0]?.message?.content ?? "";
 
-      // Strip CJK characters (Chinese/Japanese) then clean up artifacts
-      const cleanText = rawText
-        .replace(/[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]+/g, "")
-        .replace(/\(\s*\)/g, "")   // remove empty parens like ()
-        .replace(/ {2,}/g, " ")    // collapse double spaces
+      // Step 2: If CJK or English gibberish detected, rewrite in pure Korean
+      if (needsCleanup(finalText)) {
+        const cleaned = await groq.chat.completions.create({
+          model: resolvedModel,
+          messages: [
+            { role: "system" as const, content: CLEANUP_PROMPT },
+            { role: "user" as const, content: finalText },
+          ],
+          stream: false,
+          temperature: 0.2,
+          max_tokens: 2000,
+        });
+        finalText = cleaned.choices[0]?.message?.content ?? finalText;
+      }
+
+      // Step 3: Final safety strip of any remaining CJK
+      finalText = finalText
+        .replace(/[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]+/g, "")
+        .replace(/\(\s*\)/g, "")
+        .replace(/ {2,}/g, " ")
         .trim();
 
-      // Simulate streaming by sending chunks so the UI still shows a typing effect
-      const stream = new ReadableStream({
-        async start(controller) {
-          const CHUNK = 15;
-          const DELAY = 10;
-          for (let i = 0; i < cleanText.length; i += CHUNK) {
-            controller.enqueue(encoder.encode(cleanText.slice(i, i + CHUNK)));
-            if (i + CHUNK < cleanText.length) {
-              await new Promise((r) => setTimeout(r, DELAY));
-            }
-          }
-          controller.close();
-        },
-      });
-
-      return new Response(stream, {
+      return new Response(streamText(finalText, encoder), {
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
           "Transfer-Encoding": "chunked",
