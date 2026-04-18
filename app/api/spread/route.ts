@@ -53,12 +53,11 @@ positions array length MUST equal count. Respond ONLY with JSON.`,
 
     const parsed = JSON.parse(jsonMatch[0]);
     const count: number = [1, 3, 5].includes(parsed.count) ? parsed.count : 3;
-    // Validate positions: correct length, each name ≥ 3 chars, none starting with a grammar particle
-    const PARTICLE_START = /^[의은는이가을를와과도만에]/;
+    // Validate positions: correct length, each name ≥ 2 chars, none starting with "의 " (truncated genitive)
     const rawPositions: string[] = Array.isArray(parsed.positions) ? parsed.positions : [];
     const positionsValid =
       rawPositions.length === count &&
-      rawPositions.every((p: string) => typeof p === "string" && p.length >= 3 && !PARTICLE_START.test(p.trim()));
+      rawPositions.every((p: string) => typeof p === "string" && p.trim().length >= 2 && !p.trim().startsWith("의 "));
     const positions: string[] = positionsValid ? rawPositions : detectSpread(question).positions;
 
     const type = count === 1 ? "one" : count === 5 ? "five" : "three";
