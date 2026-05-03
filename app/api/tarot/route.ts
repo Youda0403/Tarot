@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { type DrawnCard, type SpreadType, SPREADS } from "@/lib/tarot";
 import { needsCleanup, fixBanmal, stripForeign, CLEANUP_PROMPT } from "@/lib/cleanText";
+import { getClient } from "@/lib/client";
 
 export const runtime = "nodejs";
 
@@ -104,23 +105,20 @@ function streamText(text: string, encoder: TextEncoder): ReadableStream {
 
 export async function POST(req: Request) {
   const body: RequestBody = await req.json();
-  const { question, cards, spreadType, positions, tone = "standard", model = "meta-llama/llama-4-scout-17b-16e-instruct" } = body;
+  const { question, cards, spreadType, positions, tone = "standard", model } = body;
   const resolvedPositions = positions ?? SPREADS[spreadType]?.positions ?? ["메시지"];
-  const ALLOWED_MODELS = [
-    "llama-3.3-70b-versatile",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-  ];
-  const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  let llm: ReturnType<typeof getClient>;
+  try {
+    llm = getClient(model);
+  } catch {
     return new Response(
-      JSON.stringify({ error: "GROQ_API_KEY가 설정되지 않았습니다." }),
+      JSON.stringify({ error: "API 키가 없어요. .env.local을 확인해주세요." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const groq = new Groq({ apiKey });
+  const { client: groq, model: resolvedModel } = llm;
   const messages = buildMessages(question, cards, resolvedPositions, tone);
   const encoder = new TextEncoder();
   let attempt = 0;

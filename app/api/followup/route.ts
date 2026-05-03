@@ -1,6 +1,6 @@
-import Groq from "groq-sdk";
 import type { DrawnCard } from "@/lib/tarot";
 import { needsCleanup, fixBanmal, stripForeign, CLEANUP_PROMPT } from "@/lib/cleanText";
+import { getClient } from "@/lib/client";
 
 export const runtime = "nodejs";
 
@@ -11,21 +11,19 @@ type RequestBody = {
   model?: string;
 };
 
-const ALLOWED_MODELS = [
-  "llama-3.3-70b-versatile",
-  "meta-llama/llama-4-scout-17b-16e-instruct",
-];
-
 export async function POST(req: Request) {
-  const { card, position, question, model = "meta-llama/llama-4-scout-17b-16e-instruct" }: RequestBody = await req.json();
+  const { card, position, question, model }: RequestBody = await req.json();
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return new Response(JSON.stringify({ status: "no key" }), { status: 500 });
+  let llm: ReturnType<typeof getClient>;
+  try {
+    llm = getClient(model);
+  } catch {
+    return new Response(JSON.stringify({ status: "no key" }), { status: 500 });
+  }
 
-  const resolvedModel = ALLOWED_MODELS.includes(model) ? model : "llama-3.3-70b-versatile";
+  const { client: groq, model: resolvedModel } = llm;
   const direction = card.isReversed ? "역방향" : "정방향";
   const meaning = card.isReversed ? card.reversedMeaning : card.upright;
-  const groq = new Groq({ apiKey });
 
   try {
     const completion = await groq.chat.completions.create({
