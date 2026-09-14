@@ -1,6 +1,8 @@
 # CATCHU! — Photo-to-GIF crane machine
 
-Work branch: `feat/otaku-gif-maker`. The root page is the new maker. The former tarot page and stylesheet are preserved under `components/LegacyTarotPage.tsx` and `components/legacy-tarot.css`; legacy API routes are unchanged. No merging or deployment is included in this commit.
+Work branch: `feat/otaku-gif-maker`. The root page is the new maker. The former tarot page, stylesheet and API routes are preserved under `components/` and `legacy/api/`.
+
+GitHub Pages deployment is built by `.github/workflows/deploy-pages.yml`. In the repository Pages settings, select **GitHub Actions** as the source. Selecting a branch directly makes GitHub Pages render this README with Jekyll instead of building the Next.js app.
 
 ## Run
 

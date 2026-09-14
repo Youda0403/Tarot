@@ -171,7 +171,7 @@ export default function Home() {
   return (
     <main>
       <header className="topbar">
-        <a className="wordmark" href="/">
+        <a className="wordmark" href="./">
           catchu<span>!</span>
         </a>
         <span className="edition">YOUR LITTLE POCKET ARCADE</span>
