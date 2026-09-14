@@ -1,419 +1,465 @@
 "use client";
-
-import { useState, useCallback, useRef, useEffect } from "react";
-import QuestionForm from "@/components/QuestionForm";
-import SpreadLayout from "@/components/SpreadLayout";
-import ReadingResult from "@/components/ReadingResult";
-import CardDetailModal from "@/components/CardDetailModal";
-import FollowUpModal from "@/components/FollowUpModal";
-import ReadingHistory from "@/components/ReadingHistory";
-import { drawCards, type DrawnCard, type SpreadInfo, type SpreadType } from "@/lib/tarot";
-import { detectSpread } from "@/lib/spread";
-import { saveReading } from "@/lib/history";
-
-type Stage = "input" | "cards" | "reading";
+import { useEffect, useRef, useState } from "react";
+import {
+  DURATION,
+  THEMES,
+  loadPhoto,
+  renderScene,
+  type Photo,
+  type Scene,
+} from "@/lib/crane";
 export type Tone = "soft" | "standard" | "sharp";
 
-const TONES: { id: Tone; label: string; desc: string }[] = [
-  { id: "soft", label: "🌸 부드럽게", desc: "따뜻하고 위로하는 말투" },
-  { id: "standard", label: "✨ 표준", desc: "균형 잡힌 전문적 말투" },
-  { id: "sharp", label: "🔮 날카롭게", desc: "직관적이고 핵심을 찌르는 말투" },
-];
-
-const MODELS = [
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", desc: "추천" },
-  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", desc: "" },
-] as const;
-
-type ModelId = (typeof MODELS)[number]["id"];
-type SpreadOverride = "auto" | 1 | 3 | 5;
-
-function getFixedSpread(count: 1 | 3 | 5): SpreadInfo {
-  if (count === 1)
-    return { type: "one", count: 1, positions: ["오늘의 메시지"], description: "핵심 메시지 한 장으로." };
-  if (count === 5)
-    return {
-      type: "five",
-      count: 5,
-      positions: ["현재 상황", "장애물", "내면의 목소리", "가능한 결과", "핵심 조언"],
-      description: "5가지 관점으로 깊게.",
-    };
-  return {
-    type: "three",
-    count: 3,
-    positions: ["과거의 영향", "현재 에너지", "미래의 가능성"],
-    description: "흐름을 3장으로.",
-  };
-}
-
 export default function Home() {
-  const [stage, setStage] = useState<Stage>("input");
-  const [question, setQuestion] = useState("");
-  const [cards, setCards] = useState<DrawnCard[]>([]);
-  const [spread, setSpread] = useState<SpreadInfo | null>(null);
-  const [readingText, setReadingText] = useState("");
-  const [loadingSpread, setLoadingSpread] = useState(false);
-  const [loadingReading, setLoadingReading] = useState(false);
-  const [isError, setIsError] = useState(false);
-  const [savingImage, setSavingImage] = useState(false);
-  const [tone, setTone] = useState<Tone>("standard");
-  const [model, setModel] = useState<ModelId>("meta-llama/llama-4-scout-17b-16e-instruct");
-  const [spreadOverride, setSpreadOverride] = useState<SpreadOverride>("auto");
-  const [historyKey, setHistoryKey] = useState(0);
-
-  // Card detail modal
-  const [detailTarget, setDetailTarget] = useState<{ card: DrawnCard; position: string } | null>(null);
-  // Follow-up modal
-  const [followUpTarget, setFollowUpTarget] = useState<{ card: DrawnCard; position: string } | null>(null);
-
-  const resultRef = useRef<HTMLDivElement>(null);
-
+  const [photos, setPhotos] = useState<Photo[]>([]),
+    [theme, setTheme] = useState(0),
+    [title, setTitle] = useState("CATCH ME!"),
+    [message, setMessage] = useState("");
+  const [playing, setPlaying] = useState(false),
+    [loading, setLoading] = useState(false),
+    [progress, setProgress] = useState<number | null>(null),
+    [error, setError] = useState(""),
+    [quality, setQuality] = useState(480),
+    [download, setDownload] = useState("");
+  const canvas = useRef<HTMLCanvasElement>(null),
+    worker = useRef<Worker | null>(null),
+    downloadRef = useRef(""),
+    busy = useRef(false),
+    uploading = useRef(false);
+  const scene: Scene = { photos, theme, title, message };
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+  const disabled = progress !== null;
   useEffect(() => {
-    if (stage !== "input") history.pushState({ stage }, "");
-  }, [stage]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setStage("input");
-      setCards([]);
-      setSpread(null);
-      setReadingText("");
-      setLoadingReading(false);
-      setIsError(false);
+    let frame = 0,
+      start = 0;
+    const draw = (now: number) => {
+      if (!start) start = now;
+      const ctx = canvas.current?.getContext("2d");
+      if (ctx)
+        renderScene(
+          ctx,
+          sceneRef.current,
+          playing ? (now - start) % DURATION : 0,
+        );
+      if (playing) frame = requestAnimationFrame(draw);
     };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  const handleBack = () => {
-    setStage("input");
-    setCards([]);
-    setSpread(null);
-    setReadingText("");
-    setLoadingReading(false);
-    setIsError(false);
-  };
-
-  const handleQuestionSubmit = async (q: string) => {
-    setQuestion(q);
-    setReadingText("");
-
-    let chosenSpread: SpreadInfo;
-
-    if (spreadOverride !== "auto") {
-      chosenSpread = getFixedSpread(spreadOverride);
-    } else {
-      setLoadingSpread(true);
-      try {
-        const res = await fetch("/api/spread", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: q }),
-        });
-        if (!res.ok) throw new Error("spread API failed");
-        const data = await res.json();
-        chosenSpread = {
-          type: (data.type ?? "three") as SpreadType,
-          count: data.count,
-          positions: data.positions,
-          description: data.description ?? "",
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, photos, theme, title, message]);
+  useEffect(
+    () => () => {
+      worker.current?.terminate();
+      if (downloadRef.current) URL.revokeObjectURL(downloadRef.current);
+    },
+    [],
+  );
+  function clearDownload() {
+    if (downloadRef.current) URL.revokeObjectURL(downloadRef.current);
+    downloadRef.current = "";
+    setDownload("");
+  }
+  function changePhoto(index: number, changes: Partial<Photo>) {
+    clearDownload();
+    setPhotos((current) =>
+      current.map((p, i) => (i === index ? { ...p, ...changes } : p)),
+    );
+  }
+  async function upload(file: File | undefined, index: number) {
+    if (!file || uploading.current || busy.current) return;
+    uploading.current = true;
+    setError("");
+    setLoading(true);
+    setPlaying(false);
+    try {
+      const image = await loadPhoto(file);
+      clearDownload();
+      setPhotos((current) => {
+        const next = [...current];
+        next[index] = {
+          image,
+          thumbnail: image.toDataURL(),
+          name: current[index]?.name || "",
+          scale: 1,
+          rotation: 0,
+          flip: false,
         };
-      } catch {
-        chosenSpread = detectSpread(q);
-      }
-      setLoadingSpread(false);
-    }
-
-    setSpread(chosenSpread);
-    setCards(drawCards(chosenSpread.count));
-    setStage("cards");
-  };
-
-  const handleAllRevealed = useCallback(async () => {
-    if (!spread) return;
-    setStage("reading");
-    setLoadingReading(true);
-    setIsError(false);
-    setReadingText("");
-
-    try {
-      const res = await fetch("/api/tarot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          cards,
-          spreadType: spread.type,
-          positions: spread.positions,
-          tone,
-          model,
-        }),
+        return next;
       });
-
-      if (!res.ok) throw new Error("API 오류");
-      if (!res.body) throw new Error("응답 없음");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value, { stream: true });
-        setReadingText(text);
-      }
-
-      if (
-        text.includes('"code":503') ||
-        text.includes("UNAVAILABLE") ||
-        text.includes('"status":"Service Unavailable"')
-      ) {
-        setReadingText("");
-        setIsError(true);
-      } else if (text && spread) {
-        saveReading({ question, spread, cards, readingText: text });
-        setHistoryKey((k) => k + 1);
-      }
-    } catch {
-      setIsError(true);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "사진을 읽지 못했어. 다시 선택해 줘.",
+      );
     } finally {
-      setLoadingReading(false);
+      uploading.current = false;
+      setLoading(false);
     }
-  }, [question, cards, spread, tone, model]);
-
-  const handleSaveImage = async () => {
-    if (!resultRef.current) return;
-    setSavingImage(true);
+  }
+  function cancel() {
+    worker.current?.terminate();
+    worker.current = null;
+    busy.current = false;
+    setProgress(null);
+  }
+  async function exportGif() {
+    if (busy.current || uploading.current) return;
+    busy.current = true;
+    setError("");
+    setPlaying(false);
+    setProgress(0);
+    clearDownload();
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(resultRef.current, {
-        backgroundColor: "#e0f2fe",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      const link = document.createElement("a");
-      link.download = "tarot-reading.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      await document.fonts.ready;
+      if (!busy.current) return;
+      const frozen = sceneRef.current;
+      const out = document.createElement("canvas");
+      out.width = quality;
+      out.height = (quality * 4) / 3;
+      const ctx = out.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas unavailable");
+      const w = new Worker(new URL("../lib/gif.worker.ts", import.meta.url));
+      worker.current = w;
+      let index = 0;
+      const count = DURATION / 100;
+      const fail = () => {
+        cancel();
+        setError("GIF 생성에 실패했어. 일반 화질로 다시 시도해 줘.");
+      };
+      const next = () => {
+        if (index >= count) {
+          w.postMessage({ type: "finish" });
+          return;
+        }
+        renderScene(ctx, frozen, index * 100);
+        const frame = ctx.getImageData(0, 0, out.width, out.height);
+        w.postMessage(
+          {
+            type: "frame",
+            data: frame.data.buffer,
+            width: out.width,
+            height: out.height,
+          },
+          [frame.data.buffer],
+        );
+        index++;
+      };
+      w.onerror = fail;
+      w.onmessage = (event) => {
+        if (event.data.type === "error") {
+          fail();
+          return;
+        }
+        if (event.data.type === "ready") next();
+        if (event.data.type === "frame") {
+          setProgress(Math.round((index / count) * 100));
+          next();
+        }
+        if (event.data.type === "done") {
+          const blob = new Blob([event.data.bytes], { type: "image/gif" });
+          const url = URL.createObjectURL(blob);
+          downloadRef.current = url;
+          setDownload(url);
+          cancel();
+        }
+      };
+      w.postMessage({ type: "start" });
     } catch {
-      alert("이미지 저장에 실패했습니다.");
-    } finally {
-      setSavingImage(false);
+      cancel();
+      setError("GIF를 준비하지 못했어. 새로고침 후 다시 시도해 줘.");
     }
-  };
-
-  const handleReset = () => {
-    setStage("input");
-    setQuestion("");
-    setCards([]);
-    setSpread(null);
-    setReadingText("");
-    setLoadingReading(false);
-    setIsError(false);
-  };
-
+  }
   return (
-    <main className="min-h-screen flex flex-col items-center px-4 py-12 gap-8">
-      {/* Header */}
-      <header className="text-center space-y-2">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-sky-700 via-ocean-500 to-sky-700 bg-clip-text text-transparent">
-          ✨ 타로 리딩
-        </h1>
-        <p className="text-sky-600 text-sm">별자리와 카드가 당신의 이야기를 들려드립니다</p>
+    <main>
+      <header className="topbar">
+        <a className="wordmark" href="/">
+          catchu<span>!</span>
+        </a>
+        <span className="edition">YOUR LITTLE POCKET ARCADE</span>
+        <span className="header-tag">PHOTO → GIF</span>
       </header>
-
-      {stage === "input" && (
-        <>
-          {/* Tone selector */}
-          <div className="w-full max-w-xl space-y-2">
-            <p className="text-sky-600 text-xs text-center font-medium">리딩 톤</p>
-            <div className="flex gap-2 justify-center">
-              {TONES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTone(t.id)}
-                  title={t.desc}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                    tone === t.id
-                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
-                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+      <section className="intro">
+        <span className="eyebrow">✦ A PRIZE THAT’S ALL YOURS ✦</span>
+        <h1>오늘의 경품은, 나의 최애.</h1>
+        <p>
+          사진 한 장, 작은 행운 한 스푼.
+          <br />
+          나만의 인형뽑기 움짤을 만들어 봐.
+        </p>
+      </section>
+      <div className="studio">
+        <section className="preview-area" aria-label="인형뽑기 미리보기">
+          <div className="preview-heading">
+            <span>THE PRIZE MACHINE</span>
+            <span className="live-dot">{playing ? "PLAYING" : "PREVIEW"}</span>
           </div>
-
-          {/* Model selector */}
-          <div className="w-full max-w-xl space-y-2">
-            <p className="text-sky-600 text-xs text-center font-medium">AI 모델</p>
-            <div className="flex gap-2 justify-center flex-wrap">
-              {MODELS.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setModel(m.id)}
-                  title={m.desc}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
-                    model === m.id
-                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
-                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
-                  }`}
-                >
-                  {m.label}
-                  {m.desc && <span className="ml-1.5 opacity-70">{m.desc}</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Spread override */}
-          <div className="w-full max-w-xl space-y-2">
-            <p className="text-sky-600 text-xs text-center font-medium">스프레드</p>
-            <div className="flex gap-2 justify-center">
-              {(["auto", 1, 3, 5] as SpreadOverride[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setSpreadOverride(v)}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                    spreadOverride === v
-                      ? "bg-sky-600 border-sky-500 text-white shadow-md"
-                      : "bg-white/60 border-sky-300 text-sky-700 hover:border-sky-500 hover:bg-white/80"
-                  }`}
-                >
-                  {v === "auto" ? "AI 자동" : `${v}장`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="w-full max-w-xl">
-            {loadingSpread ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-sky-600">
-                <div className="flex gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="w-2 h-2 rounded-full bg-sky-500 animate-bounce"
-                      style={{ animationDelay: `${i * 150}ms` }}
-                    />
-                  ))}
-                </div>
-                <p className="text-sm">고민을 읽고 스프레드를 짜는 중이에요...</p>
-              </div>
-            ) : (
-              <QuestionForm onSubmit={handleQuestionSubmit} loading={false} />
-            )}
-          </div>
-
-          <ReadingHistory key={historyKey} />
-        </>
-      )}
-
-      {(stage === "cards" || stage === "reading") && spread && (
-        <div className="w-full max-w-2xl space-y-8">
-          {/* Back button */}
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1.5 text-sky-600 text-sm hover:text-sky-800 transition-colors"
-          >
-            ← 뒤로 (모델/톤 변경)
-          </button>
-
-          {/* Question recap */}
-          <div className="text-center bg-white/50 border border-sky-300/60 rounded-2xl px-5 py-3">
-            <p className="text-sky-600 text-xs mb-1">질문</p>
-            <p className="text-sky-900 text-sm">{question}</p>
-          </div>
-
-          {/* Spread badge */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="px-4 py-1.5 rounded-full bg-sky-100 border border-sky-300 text-sky-700 text-xs font-medium">
-              {spread.count}장 스프레드
-            </span>
-            {spread.description && (
-              <p className="text-sky-600 text-xs text-center">
-                {spread.description}{!spread.description.endsWith(".") ? "." : ""}
-              </p>
-            )}
-          </div>
-
-          <SpreadLayout
-            cards={cards}
-            spread={spread}
-            onAllRevealed={handleAllRevealed}
-            onShowDetail={(card, position) => setDetailTarget({ card, position })}
-          />
-
-          {/* Result */}
-          {stage === "reading" && (
-            <ReadingResult
-              ref={resultRef}
-              text={readingText}
-              loading={loadingReading}
-              isError={isError}
-              onRetry={handleAllRevealed}
+          <div className="canvas-wrap">
+            <canvas
+              ref={canvas}
+              width={480}
+              height={640}
+              aria-label="사진이 들어가는 인형뽑기 기계"
             />
-          )}
-
-          {/* Follow-up per card */}
-          {stage === "reading" && !loadingReading && readingText && (
-            <div className="space-y-3">
-              <p className="text-sky-600 text-xs text-center">카드에 대해 더 알고 싶다면</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {cards.map((card, i) => (
+          </div>
+          <div className="preview-actions">
+            <button
+              className="play-button"
+              onClick={() => setPlaying(!playing)}
+              disabled={disabled}
+            >
+              {playing ? "Ⅱ 정지" : "▷ 뽑아보기"}
+            </button>
+            <span>6초의 작은 행복 · 반복 재생</span>
+          </div>
+          <p className="sample-note">
+            {photos.length === 0
+              ? "지금은 샘플 인형이 들어 있어. 아래에서 최애를 넣어 줘!"
+              : "사진은 이 기기에서만 처리되고 서버로 전송되지 않아."}
+          </p>
+        </section>
+        <aside className="editor">
+          <fieldset disabled={disabled || loading}>
+            <section className="control-section">
+              <div className="section-label">
+                <span className="step">01</span>
+                <h2>경품을 넣어 줘</h2>
+                <span className="small-note">최대 두 명</span>
+              </div>
+              <div className="upload-grid">
+                {Array.from(
+                  { length: Math.min(2, photos.length + 1) },
+                  (_, i) => (
+                    <div className="photo-slot" key={i}>
+                      <label
+                        className={
+                          "upload-box " + (photos[i] ? "has-photo" : "")
+                        }
+                      >
+                        {photos[i] ? (
+                          <img
+                        src={photos[i].thumbnail}
+                            alt={`캐릭터 ${i + 1}`}
+                          />
+                        ) : (
+                          <>
+                            <span className="upload-plus">＋</span>
+                            <strong>
+                              {i === 0 ? "사진 넣기" : "한 명 더"}
+                            </strong>
+                            <span>PNG · JPG · WebP</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          aria-label={`캐릭터 ${i + 1} 사진 선택`}
+                          onChange={(e) => {
+                            upload(e.target.files?.[0], i);
+                            e.target.value = "";
+                          }}
+                        />
+                        {photos[i] && (
+                          <span className="replace-label">사진 바꾸기</span>
+                        )}
+                      </label>
+                      {photos[i] && (
+                        <>
+                          <input
+                            className="name-input"
+                            aria-label={`캐릭터 ${i + 1} 이름`}
+                            maxLength={12}
+                            placeholder="이름 (선택)"
+                            value={photos[i].name}
+                            onChange={(e) =>
+                              changePhoto(i, { name: e.target.value })
+                            }
+                          />
+                          <details>
+                            <summary>크기·방향 조절</summary>
+                            <label className="slider-label">
+                              크기
+                              <input
+                                aria-label={`캐릭터 ${i + 1} 크기`}
+                                type="range"
+                                min="0.65"
+                                max="1.2"
+                                step="0.01"
+                                value={photos[i].scale}
+                                onChange={(e) =>
+                                  changePhoto(i, { scale: +e.target.value })
+                                }
+                              />
+                            </label>
+                            <label className="slider-label">
+                              회전
+                              <input
+                                aria-label={`캐릭터 ${i + 1} 회전`}
+                                type="range"
+                                min="-20"
+                                max="20"
+                                value={photos[i].rotation}
+                                onChange={(e) =>
+                                  changePhoto(i, { rotation: +e.target.value })
+                                }
+                              />
+                            </label>
+                            <div className="tiny-actions">
+                              <button
+                                onClick={() =>
+                                  changePhoto(i, { flip: !photos[i].flip })
+                                }
+                              >
+                                좌우 반전
+                              </button>
+                              <button
+                                onClick={() =>
+                                  changePhoto(i, {
+                                    scale: 1,
+                                    rotation: 0,
+                                    flip: false,
+                                  })
+                                }
+                              >
+                                초기화
+                              </button>
+                            </div>
+                          </details>
+                          <button
+                            className="remove"
+                            onClick={() => {
+                              clearDownload();
+                              setPhotos((current) =>
+                                current.filter((_, j) => j !== i),
+                              );
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+              <p className="hint">
+                투명 PNG라면 인형처럼, 배경이 있으면 포토카드처럼.
+                <br />
+                투명 여백은 자동으로 정리해 줄게.
+              </p>
+              {loading && <p role="status">사진을 준비하는 중…</p>}
+            </section>
+            <section className="control-section">
+              <div className="section-label">
+                <span className="step">02</span>
+                <h2>기계의 색</h2>
+                <span className="small-note">{THEMES[theme].label}</span>
+              </div>
+              <div className="swatches">
+                {THEMES.map((t, i) => (
                   <button
-                    key={card.id}
-                    onClick={() => setFollowUpTarget({ card, position: spread.positions[i] })}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/60 border border-sky-300 text-sky-700 text-xs hover:bg-white/80 transition-colors"
+                    key={t.name}
+                    aria-label={t.label}
+                    aria-pressed={theme === i}
+                    title={t.label}
+                    className={theme === i ? "selected" : ""}
+                    style={{ background: t.body }}
+                    onClick={() => {
+                      clearDownload();
+                      setTheme(i);
+                    }}
                   >
-                    <span>{card.image}</span>
-                    <span>{card.nameko}</span>
+                    {theme === i ? "✓" : ""}
                   </button>
                 ))}
               </div>
+            </section>
+            <section className="control-section">
+              <div className="section-label">
+                <span className="step">03</span>
+                <h2>작은 한마디</h2>
+                <span className="small-note">선택</span>
+              </div>
+              <label className="text-label">
+                간판 문구<span>{title.length}/12</span>
+                <input
+                  maxLength={12}
+                  value={title}
+                  placeholder="CATCH ME!"
+                  onChange={(e) => {
+                    clearDownload();
+                    setTitle(e.target.value);
+                  }}
+                />
+              </label>
+              <label className="text-label">
+                당첨 문구<span>{message.length}/12</span>
+                <input
+                  maxLength={12}
+                  value={message}
+                  placeholder={photos.length === 2 ? "DOUBLE GET!" : "GET!"}
+                  onChange={(e) => {
+                    clearDownload();
+                    setMessage(e.target.value);
+                  }}
+                />
+              </label>
+            </section>
+            <div className="quality-row">
+              <label htmlFor="quality">저장 크기</label>
+              <select
+                id="quality"
+                value={quality}
+                onChange={(e) => {
+                  clearDownload();
+                  setQuality(+e.target.value);
+                }}
+              >
+                <option value={480}>일반 · 480 × 640</option>
+                <option value={720}>고화질 · 720 × 960</option>
+              </select>
+            </div>
+          </fieldset>
+          <button
+            className="export-button"
+            disabled={disabled || loading || !photos.length}
+            onClick={exportGif}
+          >
+            {disabled
+              ? `GIF 만드는 중… ${progress}%`
+              : "나의 경품 GIF 만들기  ↗"}
+          </button>
+          {disabled && (
+            <div className="export-progress">
+              <progress value={progress ?? 0} max={100} />
+              <button onClick={cancel}>취소</button>
             </div>
           )}
-
-          {/* Buttons */}
-          {stage === "reading" && !loadingReading && readingText && (
-            <div className="flex justify-center gap-3 flex-wrap">
-              <button
-                onClick={handleSaveImage}
-                disabled={savingImage}
-                className="px-6 py-2.5 rounded-2xl bg-sky-600 border border-sky-500 text-white text-sm hover:bg-sky-700 transition-colors disabled:opacity-50 shadow-sm"
-              >
-                {savingImage ? "저장 중..." : "🖼️ 이미지로 저장"}
-              </button>
-              <button
-                onClick={handleReset}
-                className="px-6 py-2.5 rounded-2xl bg-white/60 border border-sky-300 text-sky-700 text-sm hover:bg-white/80 transition-colors shadow-sm"
-              >
-                🔄 다시 뽑기
-              </button>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {download && (
+            <div className="download-result">
+              <p>경품 준비 완료! ♡</p>
+              <a href={download} download="catchu-prize.gif">
+                GIF 저장하기 ↓
+              </a>
+              <details>
+                <summary>완성된 GIF 확인</summary>
+                <img src={download} alt="완성된 인형뽑기 GIF" />
+              </details>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Modals */}
-      {detailTarget && (
-        <CardDetailModal
-          card={detailTarget.card}
-          position={detailTarget.position}
-          onClose={() => setDetailTarget(null)}
-        />
-      )}
-      {followUpTarget && (
-        <FollowUpModal
-          card={followUpTarget.card}
-          position={followUpTarget.position}
-          question={question}
-          model={model}
-          onClose={() => setFollowUpTarget(null)}
-        />
-      )}
+          <p className="privacy">
+            회원가입 없이 · 사진 업로드 서버 없이 · 오직 내 최애
+          </p>
+        </aside>
+      </div>
+      <footer>
+        <span className="wordmark">catchu!</span>
+        <p>SMALL THINGS. BIG LOVE.</p>
+        <span>개인적으로 사용 가능한 사진으로 만들어 줘 ♡</span>
+      </footer>
     </main>
   );
 }

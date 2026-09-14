@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "✨ 타로 리딩",
-  description: "AI와 함께하는 신비로운 타로 카드 리딩",
+  title: "CATCHU! — 나의 최애 인형뽑기",
+  description: "사진 한두 장으로 만드는 작은 인형뽑기 GIF. 내 최애를 오늘의 경품으로!",
 };
 
 export default function RootLayout({
