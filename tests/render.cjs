@@ -13,15 +13,20 @@ vm.runInNewContext(source,{exports:exportsObject});
 const {pose,renderScene,DURATION,THEMES}=exportsObject;
 for(let time=0;time<DURATION;time+=10){const p=pose(time);for(const key of ['x','y','prizeX','prizeY','open'])assert(Number.isFinite(p[key]));assert(p.open>=0&&p.open<=1);}
 for(const failed of [false,true]){
-  for(const boundary of [800,1800,2200,2950,3100,3500,3800,4600,5000]){
+  for(const boundary of [800,1800,2200,3100,3420,3800,4550,5000]){
     const before=pose(boundary-.01,210,failed),after=pose(boundary+.01,210,failed);
     for(const key of ['x','y','prizeX','prizeY','open']) assert(Math.abs(before[key]-after[key])<1,`${failed}: ${key} jumps at ${boundary}`);
   }
 }
 assert(pose(2700,210,true).held, 'Failed attempt must pick up a doll');
-assert(pose(3700,210,true).held, 'Failed attempt carries the doll to the chute');
-assert(!pose(4000,210,true).held, 'Failed attempt releases beside the chute');
-assert.equal(pose(5000,210,true).prizeY,398);
+for(let time=0;time<DURATION;time+=10){
+  const won=pose(time,210,false),lost=pose(time,210,true);
+  for(const key of ['x','y','open']) assert(Math.abs(won[key]-lost[key])<.001,`claw ${key} differs at ${time}`);
+}
+assert(pose(3300,210,true).held, 'Failed attempt starts the trip holding a doll');
+assert(!pose(3500,210,true).held, 'The doll slips during the trip to the chute');
+assert(pose(3500,210,false).held, 'Successful attempt keeps holding the doll');
+assert.equal(pose(5000,210,true).prizeY,402);
 assert.equal(pose(7000,210,false).x,156);
 assert(pose(DURATION-100,210,false).result, 'Result stays visible through end of turn');
 const image=createCanvas(140,220);const brush=image.getContext('2d');brush.fillStyle='#dab4c6';brush.beginPath();brush.roundRect(10,15,120,200,50);brush.fill();brush.fillStyle='#665167';brush.fillRect(42,85,8,13);brush.fillRect(90,85,8,13);

@@ -77,28 +77,34 @@ export function pose(time: number, targetX = 240, failed = false) {
     open = 0;
     held = true;
   } else if (t < 3.8) {
-    x = mix(targetX, failed ? 279 : 325, ease((t - 3.1) / 0.7));
+    x = mix(targetX, 325, ease((t - 3.1) / 0.7));
     y = 210;
     open = 0;
-    held = true;
-  } else if (failed) {
-    x = mix(279, 156, ease((t - 4.4) / 1.2));
-    y = mix(210, 188, ease((t - 4.4) / 0.6));
-    open = ease((t - 3.8) / 0.3);
-    const fall = Math.max(0, (t - 3.8) / 0.6);
-    prizeX = mix(279, 258, ease(fall));
-    prizeY = mix(258, 398, fall * fall);
-    if (fall >= 1) prizeY -= Math.sin(Math.min(1, (t - 4.4) / 0.35) * Math.PI) * 7;
-    result = t >= 4.4;
+    held = !failed || t < 3.42;
+    if (failed && !held) {
+      const releaseX = mix(targetX, 325, ease((3.42 - 3.1) / 0.7));
+      const fall = (t - 3.42) / 0.7;
+      prizeX = mix(releaseX, releaseX + 12, ease(fall));
+      prizeY = mix(258, 402, fall * fall);
+    }
   } else {
-    x = mix(325, 156, ease((t - 4.6) / 1.2));
-    y = mix(210, 188, ease((t - 4.6) / 0.6));
+    x = mix(325, 156, ease((t - 4.55) / 1.2));
+    y = mix(210, 188, ease((t - 4.55) / 0.6));
     open = ease((t - 3.8) / 0.22);
-    const fall = Math.max(0, (t - 3.8) / 0.8);
-    prizeX = 325;
-    prizeY = mix(258, 545, fall * fall);
-    if (fall >= 1) prizeY -= Math.sin(Math.min(1, (t - 4.6) / 0.4) * Math.PI) * 6;
-    result = t >= 4.6;
+    if (failed) {
+      const releaseX = mix(targetX, 325, ease((3.42 - 3.1) / 0.7));
+      const fall = (t - 3.42) / 0.7;
+      prizeX = mix(releaseX, releaseX + 12, ease(fall));
+      prizeY = mix(258, 402, fall * fall);
+      if (fall >= 1)
+        prizeY -= Math.sin(Math.min(1, (fall - 1) * 2) * Math.PI) * 6;
+    } else {
+      const fall = Math.max(0, (t - 3.8) / 0.8);
+      prizeX = 325;
+      prizeY = mix(258, 545, fall * fall);
+      if (fall >= 1) prizeY -= Math.sin(Math.min(1, (t - 4.6) / 0.4) * Math.PI) * 6;
+    }
+    result = t >= 4.55;
   }
   if (held) {
     prizeX = x;
@@ -191,10 +197,7 @@ export function renderScene(
       ctx.arc(x, y, 1.5, 0, 7);
       ctx.fill();
     }
-  // Reserve a generous space above the cabinet for the result lettering.
-  ctx.save();
-  ctx.translate(24, 58);
-  ctx.scale(0.9, 0.9);
+  text("A LITTLE LUCK, A LOT OF LOVE", 240, 30, 10, theme.dark);
   ctx.fillStyle = "#dfd2c6";
   ctx.beginPath();
   ctx.ellipse(240, 603, 182, 13, 0, 0, 7);
@@ -211,7 +214,7 @@ export function renderScene(
     ctx.fill();
   }
   text(scene.title.trim() || "CATCH ME!", 236, 113, 29, theme.dark, 300);
-  text("♡  YOUR FAVORITE, NOW A PRIZE  ♡", 236, 134, 11, theme.dark);
+  text("♡  YOUR FAVORITE, NOW A PRIZE  ♡", 236, 134, 8, theme.dark);
   box(72, 161, 328, 296, 16, theme.dark);
   box(81, 170, 310, 277, 9, theme.light);
   ctx.save();
@@ -286,27 +289,36 @@ export function renderScene(
     ctx.restore();
   };
 
-  // The uploaded cutouts repeat through the pile like stocked character dolls.
-  ctx.save();
-  ctx.filter = "blur(2px)";
-  ctx.globalAlpha = 0.45;
-  for (let i = 0; i < 9; i++) {
-    const photo = scene.photos[i % Math.max(1, scene.photos.length)];
-    if (photo) drawPhoto(photo, 109 + i * 32, 368 + (i % 3) * 9, 56, 68, Math.sin(i * 3) * 0.2);
-  }
-  ctx.restore();
-  plush(104, 395, 24, "#e6bfcf");
-  plush(363, 397, 26, "#fff4cc", 1);
+  // Clear, evenly staggered rows make the cabinet feel fully stocked.
+  [
+    [105, 384, 21, "#e6bfcf"],
+    [151, 377, 22, "#fff4cc"],
+    [196, 390, 21, "#c1d8c3"],
+    [241, 376, 22, "#d2c4e6"],
+    [286, 389, 21, "#efb8bc"],
+    [331, 377, 22, "#fff4cc"],
+    [372, 391, 20, "#c1d8c3"],
+  ].forEach((a, i) =>
+    plush(
+      a[0] as number,
+      a[1] as number,
+      a[2] as number,
+      a[3] as string,
+      i % 3 === 1 ? 1 : 0,
+    ),
+  );
   const pileLayouts = [
     [
-      [119, 414, 61, 76, -0.14],
-      [218, 424, 61, 76, 0.08],
-      [355, 404, 59, 73, -0.11],
+      [112, 411, 58, 72, -0.14],
+      [186, 428, 60, 74, 0.08],
+      [260, 409, 58, 72, -0.08],
+      [340, 426, 60, 74, 0.12],
     ],
     [
-      [166, 410, 59, 72, 0.13],
-      [269, 427, 61, 76, -0.08],
-      [378, 430, 57, 69, 0.15],
+      [146, 426, 58, 72, 0.13],
+      [222, 405, 59, 73, -0.08],
+      [300, 428, 58, 72, 0.1],
+      [373, 410, 57, 70, -0.12],
     ],
   ] as const;
   scene.photos.forEach((photo, photoIndex) =>
@@ -332,21 +344,19 @@ export function renderScene(
 
   const targetPhoto = scene.photos[targetIndex];
   if (targetPhoto) {
-    const swing = p.held ? Math.sin(time / 170) * 0.045 : 0;
+    const droppedFor = Math.max(0, time - 3420);
+    const fallingWobble =
+      failed && !p.held && droppedFor < 700
+        ? Math.sin(droppedFor / 65) * 0.18 * (1 - ease(droppedFor / 700))
+        : 0;
+    const swing = p.held ? Math.sin(time / 170) * 0.045 : fallingWobble;
     drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, swing);
   }
   // Visible mouth of the chute, aligned with the retrieval bay below.
-  const metal = ctx.createLinearGradient(291, 413, 360, 447);
-  metal.addColorStop(0, "#f6f8fa");
-  metal.addColorStop(0.4, "#aab3bd");
-  metal.addColorStop(0.65, "#e0e5e9");
-  metal.addColorStop(1, "#7c8793");
-  box(288, 411, 76, 36, 2, "#9ca6b0", "#73808d");
-  ctx.fillStyle = metal;
-  ctx.fillRect(291, 414, 70, 30);
-  box(297, 419, 58, 17, 1, "#3e4751");
-  line(291, 414, 361, 414, "#fff", 2);
-  line(299, 439, 357, 439, "#eef2f6", 2);
+  box(288, 411, 76, 36, 4, "#b9bdc5", theme.dark);
+  box(296, 418, 60, 19, 3, "#4d4c59");
+  line(293, 415, 359, 415, "#f7f5f0", 2);
+  line(299, 440, 354, 440, "#e4e3e7", 2);
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
   const spread = 12 + p.open * 17;
@@ -386,34 +396,21 @@ export function renderScene(
   ctx.stroke();
   box(191, 463, 62, 22, 4, "#443d4e");
   text("01 PLAY", 222, 478, 10, "#fff4cc");
-  ctx.fillStyle = theme.dark;
-  ctx.beginPath();
-  ctx.ellipse(340, 478, 23, 12, 0, 0, 7);
-  ctx.fill();
-  ctx.fillStyle = "#e8bd65";
-  ctx.beginPath();
-  ctx.ellipse(340, 471, 22, 12, 0, 0, 7);
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(340, 471, 22, 12, 0, 0, 7);
-  ctx.stroke();
-  // Metal retaining ring, cylindrical wall, inset illuminated cap and highlight.
-  const ellipse = (y: number, rx: number, ry: number, fill: string | CanvasGradient) => {
+  const ellipse = (y: number, rx: number, ry: number, fill: string) => {
     ctx.beginPath(); ctx.ellipse(340, y, rx, ry, 0, 0, 7);
     ctx.fillStyle = fill; ctx.fill();
   };
-  ellipse(480, 28, 14, "#81838d");
-  ellipse(477, 27, 13, "#e6e8ed");
-  box(317, 466, 46, 12, 5, "#ad793d");
-  ellipse(477, 23, 11, "#ad793d");
-  const cap = ctx.createLinearGradient(0, 453, 0, 477);
-  cap.addColorStop(0, "#fff5b8"); cap.addColorStop(0.5, "#f5d16e"); cap.addColorStop(1, "#d69a42");
-  ellipse(466, 23, 12, cap);
-  ctx.beginPath(); ctx.ellipse(340, 464, 18, 8, 0, Math.PI, Math.PI * 2);
-  ctx.strokeStyle = "#fff9d9"; ctx.lineWidth = 2; ctx.stroke();
-  text("DROP", 340, 470, 10, "#755326");
+  ellipse(480, 28, 12, theme.dark);
+  box(316, 465, 48, 13, 5, theme.dark);
+  ellipse(465, 25, 12, theme.dark);
+  box(318, 461, 44, 11, 5, theme.body);
+  ellipse(461, 22, 10, theme.body);
+  ctx.beginPath();
+  ctx.ellipse(340, 458, 15, 6, 0, Math.PI, Math.PI * 2);
+  ctx.strokeStyle = theme.light;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  text("DROP", 340, 465, 9, theme.dark);
   box(102, 519, 58, 43, 6, theme.light, theme.dark);
   box(127, 525, 6, 22, 2, theme.dark);
   text("COIN", 131, 558, 8, theme.dark);
@@ -432,41 +429,53 @@ export function renderScene(
     ctx.fillRect(250, 567, 127, 6);
   }
   text("CATCHU!  /  POCKET ARCADE", 240, 625, 9, theme.dark);
-  ctx.restore();
   if (p.result) {
-    const elapsed = (time - (failed ? 4400 : 4600)) / 1000;
+    const elapsed = (time - 4550) / 1000;
     const pop = Math.min(1, elapsed / 0.45);
     const size = 1 + Math.sin(pop * Math.PI) * 0.24;
+    const customMessage = scene.message.trim();
+    const resultX = customMessage ? 240 : 400;
+    const resultY = customMessage ? 213 : 169;
     ctx.save();
-    ctx.translate(240, 70 - ease(pop) * 8);
-    ctx.rotate(-0.06);
+    ctx.translate(resultX, resultY - ease(pop) * 5);
+    if (!customMessage) ctx.rotate(0.07);
     ctx.scale(size, size);
-    ctx.font = 'italic 900 42px "Arial Black", "DejaVu Sans", sans-serif';
-    ctx.textAlign = "center";
+    ctx.font = '900 31px "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
     ctx.lineJoin = "round";
-    ctx.lineWidth = 7;
+    ctx.lineWidth = 6;
     ctx.strokeStyle = "#fff9e9";
-    const message = scene.message.trim() || (failed ? "Fail" : "GET!");
-    ctx.strokeText(message, 0, 0, 270);
-    ctx.fillStyle = theme.dark;
-    ctx.fillText(message, 0, 0, 270);
+    const message = customMessage || (failed ? "Fail" : "GET!");
+    if (!customMessage) {
+      const letters = message.split("");
+      const gap = 24;
+      letters.forEach((letter, i) => {
+        ctx.save();
+        ctx.translate((i - (letters.length - 1) / 2) * gap, i % 2 ? 1 : -2);
+        ctx.rotate((i % 2 ? 1 : -1) * 0.08);
+        ctx.textAlign = "center";
+        ctx.strokeText(letter, 0, 0);
+        ctx.fillStyle = failed ? theme.dark : i % 2 ? "#e3a83f" : theme.dark;
+        ctx.fillText(letter, 0, 0);
+        ctx.restore();
+      });
+    } else {
+      ctx.textAlign = "center";
+      ctx.strokeText(message, 0, 0, 300);
+      ctx.fillStyle = theme.dark;
+      ctx.fillText(message, 0, 0, 300);
+    }
     ctx.restore();
-    for (let i = 0; i < (failed ? 6 : 14); i++) {
+    for (let i = 0; i < (failed ? 6 : 10); i++) {
       const q = ease(Math.min(1, elapsed / 0.55));
-      const angle = (i / (failed ? 6 : 14)) * Math.PI * 2;
+      const angle = (i / (failed ? 6 : 10)) * Math.PI * 2;
       star(
-        240 + Math.cos(angle) * (60 + q * 68),
-        51 + Math.sin(angle) * (10 + q * 20),
+        resultX + Math.cos(angle) * (24 + q * 28),
+        resultY - 5 + Math.sin(angle) * (10 + q * 17),
         ((failed ? 2 : 3) + (i % 3)) * (0.7 + 0.3 * Math.sin(elapsed * 5 + i)),
         failed ? "#b6a9ae" : i % 2 ? theme.dark : "#e3b655",
       );
     }
   }
-  ctx.beginPath();
-  ctx.roundRect(9, 9, 462, 622, 25);
-  ctx.strokeStyle = theme.body;
-  ctx.lineWidth = 3;
-  ctx.stroke();
   ctx.restore();
 }
 
