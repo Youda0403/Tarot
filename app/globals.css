@@ -550,3 +550,15 @@ footer > span:last-child {
     font-size: 12px;
   }
 }
+
+.pile-controls { margin-top: 20px; padding: 16px; border: 1px solid #e5d8d1; border-radius: 16px; background: #fffaf3; }
+.pile-controls-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.shuffle-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 10px 15px; border: 1px solid #ac526c; border-radius: 12px; background: #fce6e8; color: #844159; cursor: pointer; }
+.shuffle-button:hover { background: #f8d7dd; }
+.shuffle-button:focus-visible, .pile-count-slider:focus-visible { outline: 3px solid #ac526c; outline-offset: 3px; }
+.shuffle-button:disabled, .pile-count-slider:disabled { opacity: .5; cursor: not-allowed; }
+.pile-count-label { display: flex; justify-content: space-between; align-items: center; }
+.pile-count-label output { color: #844159; font-variant-numeric: tabular-nums; }
+.pile-count-slider { display: block; width: 100%; min-height: 44px; margin: 2px 0; accent-color: #ac526c; cursor: pointer; }
+.pile-count-ticks { display: flex; justify-content: space-between; color: #8b7775; font-size: 11px; }
+.pile-controls .hint { margin-bottom: 0; }

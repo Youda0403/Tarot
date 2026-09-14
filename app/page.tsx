@@ -16,6 +16,7 @@ export default function Home() {
     [outcome, setOutcome] = useState<Outcome>(0),
     [theme, setTheme] = useState(0),
     [pileSeed, setPileSeed] = useState(0),
+    [pileCount, setPileCount] = useState(8),
     [title, setTitle] = useState("CATCH ME!"),
     [message, setMessage] = useState("");
   const [playing, setPlaying] = useState(false),
@@ -29,7 +30,7 @@ export default function Home() {
     downloadRef = useRef(""),
     busy = useRef(false),
     uploading = useRef(false);
-  const scene: Scene = { photos, theme, title, message, outcome, pileSeed };
+  const scene: Scene = { photos, theme, title, message, outcome, pileSeed, pileCount };
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const disabled = progress !== null;
@@ -49,7 +50,7 @@ export default function Home() {
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playing, photos, theme, title, message, outcome, pileSeed]);
+  }, [playing, photos, theme, title, message, outcome, pileSeed, pileCount]);
   useEffect(
     () => () => {
       worker.current?.terminate();
@@ -398,11 +399,25 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="hint">선택한 결과 그대로 미리보기와 GIF가 만들어져.</p>
-                <button type="button" disabled={disabled} onClick={() => {
-                  clearDownload();
-                  setPileSeed(seed => seed + 1);
-                }}>↻ 인형 다시 섞기</button>
-                <p className="hint">두 사진의 수와 좌우 균형을 맞춰 골고루 섞어 줘.</p>
+                <div className="pile-controls">
+                  <div className="pile-controls-heading">
+                    <span>인형 배치</span>
+                    <button className="shuffle-button" type="button" disabled={disabled}
+                      onClick={() => { clearDownload(); setPileSeed(seed => seed + 1); }}>
+                      <span aria-hidden="true">↻</span> 다시 섞기
+                    </button>
+                  </div>
+                  <label className="pile-count-label" htmlFor="pile-count">
+                    사진 인형 수 <output>{pileCount}개</output>
+                  </label>
+                  <input id="pile-count" className="pile-count-slider" type="range"
+                    min="4" max="12" step="4" value={pileCount} disabled={disabled}
+                    onChange={event => { clearDownload(); setPileCount(Number(event.target.value)); }} />
+                  <div className="pile-count-ticks" aria-hidden="true">
+                    <span>아담하게</span><span>적당하게</span><span>가득하게</span>
+                  </div>
+                  <p className="hint">앞·뒷줄에 두 사진을 같은 수로 섞어 줘. 기본 인형은 함께 남아 있어.</p>
+                </div>
               </section>
             )}
             <section className="control-section">

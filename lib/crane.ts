@@ -52,6 +52,7 @@ export type Scene = {
   message: string;
   outcome: Outcome;
   pileSeed?: number;
+  pileCount?: number;
 };
 export const DURATION = 6800;
 const mix = (a: number, b: number, t: number) =>
@@ -61,21 +62,22 @@ const ease = (t: number) => {
   return t * t * (3 - 2 * t);
 };
 
-export function makePile(seed = 0, count = 2) {
+export function makePile(seed = 0, count = 2, total = 8) {
+  const columns = Math.max(2, Math.min(6, Math.round(total / 4) * 2));
   let state = (Math.imul(seed + 1, 2654435761)) >>> 0;
   const random = () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     return state / 4294967296;
   };
   return [0, 1].flatMap(row => {
-    const ids = count > 1 ? [0, 0, 1, 1] : [0, 0, 0, 0];
-    for (let i = 3; i > 0; i--) {
+    const ids = Array.from({ length: columns }, (_, i) => count > 1 ? i % 2 : 0);
+    for (let i = columns - 1; i > 0; i--) {
       const j = Math.floor(random() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
     return ids.map((photoIndex, col) => ({
-      id: row * 4 + col, row, photoIndex,
-      x: 117 + col * 79 + (random() - 0.5) * 28,
+      id: row * columns + col, row, photoIndex,
+      x: 117 + col * (237 / (columns - 1)) + (random() - 0.5) * 20,
       y: (row ? 428 : 399) + (random() - 0.5) * 14,
       rotation: (random() - 0.5) * 0.65,
       maxW: 61, maxH: 76,
@@ -146,7 +148,7 @@ export function renderScene(
   const theme = THEMES[scene.theme] || THEMES[0];
   const failed = scene.outcome === "fail";
   const targetIndex = scene.outcome === 1 && scene.photos[1] ? 1 : 0;
-  const pile = makePile(scene.pileSeed, scene.photos.length);
+  const pile = makePile(scene.pileSeed, scene.photos.length, scene.pileCount);
   const target = pile.find(item => item.photoIndex === targetIndex && item.row === 0)!;
   const p = pose(time, target.x, failed, target.y);
   const w = ctx.canvas.width;
@@ -333,7 +335,26 @@ export function renderScene(
       i % 3 === 1 ? 1 : 0,
     ),
   );
+  const drawClaw = () => {
+  line(p.x, 185, p.x, p.y, "#958d91", 4);
+  box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
+  const spread = 12 + p.open * 17;
+  for (const side of [-1, 1]) {
+    line(p.x + side * 10, p.y + 8, p.x + side * spread, p.y + 33, "#8b7e86", 6);
+    line(
+      p.x + side * spread,
+      p.y + 33,
+      p.x + side * (spread - 10),
+      p.y + 48,
+      "#8b7e86",
+      6,
+    );
+    line(p.x + side * 10, p.y + 8, p.x + side * spread, p.y + 33, "#fff8e9", 2);
+  }
+  };
+  let clawDrawn = false;
   pile.slice().sort((a, b) => a.y - b.y).forEach(item => {
+    if (item.row === 1 && !clawDrawn) { drawClaw(); clawDrawn = true; }
     const photo = scene.photos[item.photoIndex];
     if (!photo) return;
     const moving = item.id === target.id && time >= 2200;
@@ -374,21 +395,7 @@ export function renderScene(
   ctx.lineWidth = 2;
   ctx.stroke();
   line(294, 422, 358, 422, "#f7f5f0", 2);
-  line(p.x, 185, p.x, p.y, "#958d91", 4);
-  box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
-  const spread = 12 + p.open * 17;
-  for (const side of [-1, 1]) {
-    line(p.x + side * 10, p.y + 8, p.x + side * spread, p.y + 33, "#8b7e86", 6);
-    line(
-      p.x + side * spread,
-      p.y + 33,
-      p.x + side * (spread - 10),
-      p.y + 48,
-      "#8b7e86",
-      6,
-    );
-    line(p.x + side * 10, p.y + 8, p.x + side * spread, p.y + 33, "#fff8e9", 2);
-  }
+
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 0.4;
