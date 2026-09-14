@@ -64,14 +64,14 @@ const ease = (t: number) => {
 };
 
 export function makePile(seed = 0, count = 2, total = 8) {
-  const columns = Math.max(2, Math.min(6, Math.round(total / 4) * 2));
+  const columns = Math.max(2, Math.min(6, Math.round(total / 2)));
   let state = (Math.imul(seed + 1, 2654435761)) >>> 0;
   const random = () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     return state / 4294967296;
   };
   const layout = [0, 1].flatMap(row => {
-    const ids = Array.from({ length: columns }, (_, i) => count > 1 ? i % 2 : 0);
+    const ids = Array.from({ length: columns }, (_, i) => count > 1 ? (i + row) % 2 : 0);
     for (let i = columns - 1; i > 0; i--) {
       const j = Math.floor(random() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];
@@ -279,12 +279,23 @@ export function renderScene(
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.sin(x) * 0.18);
-    if (kind) {
+    if (kind === 1) {
       star(0, 0, size, color);
     } else {
       box(-size * 0.7, -size, size * 1.4, size * 1.6, size * 0.55, color);
+      if (kind === 2) {
+        ctx.fillStyle = color;
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(side * size * 0.65, -size * 0.45);
+          ctx.lineTo(side * size * 0.62, -size * 1.3);
+          ctx.lineTo(side * size * 0.12, -size * 0.8);
+          ctx.closePath(); ctx.fill();
+        }
+      } else {
       box(-size * 0.65, -size * 1.35, size * 0.45, size * 0.65, 8, color);
       box(size * 0.2, -size * 1.35, size * 0.45, size * 0.65, 8, color);
+      }
     }
     ctx.fillStyle = "#735f65";
     ctx.beginPath();
@@ -335,17 +346,17 @@ export function renderScene(
 
   // Clear, evenly staggered rows make the cabinet feel fully stocked.
   [
-    [110, 391, 31, "#e6bfcf"],
-    [194, 390, 33, "#fff4cc"],
-    [278, 388, 31, "#d2c4e6"],
-    [365, 392, 32, "#c1d8c3"],
+    [110, 374, 31, "#e6bfcf"],
+    [194, 370, 33, "#fff4cc"],
+    [278, 372, 31, "#d2c4e6"],
+    [365, 374, 32, "#c1d8c3"],
   ].forEach((a, i) =>
     plush(
       a[0] as number,
       a[1] as number,
       a[2] as number,
       a[3] as string,
-      i % 3 === 1 ? 1 : 0,
+      i % 2 === 0 ? 2 : 0,
     ),
   );
   const drawClaw = () => {
@@ -388,11 +399,6 @@ export function renderScene(
     if (photo) drawPhoto(photo, item.x, item.y, item.maxW, item.maxH, item.rotation);
   });
   if (!rigDrawn) drawRig();
-  [
-    [127, 442, 32, "#efb8bc"],
-    [239, 447, 33, "#fff4cc"],
-    [375, 451, 30, "#c1d8c3"],
-  ].forEach((a, i) => plush(a[0] as number, a[1] as number, a[2] as number, a[3] as string, i % 2));
 
   // Visible mouth of the chute, aligned with the retrieval bay below.
   ctx.beginPath();
@@ -536,9 +542,9 @@ export function renderScene(
 
 export async function loadPhoto(file: File): Promise<HTMLCanvasElement> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
-    throw new Error("PNG, JPG, WebP 사진을 선택해 줘.");
+    throw new Error("PNG, JPG, WebP 사진을 선택해 주세요.");
   if (file.size > 20 * 1024 * 1024)
-    throw new Error("사진은 20MB 이하로 넣어 줘.");
+    throw new Error("사진은 20MB 이하로 넣어 주세요.");
   const url = URL.createObjectURL(file);
   try {
     const image = new Image();
@@ -563,7 +569,7 @@ export async function loadPhoto(file: File): Promise<HTMLCanvasElement> {
           t = Math.min(t, y);
           b = Math.max(b, y);
         }
-    if (r < 0) throw new Error("사진이 완전히 투명해. 다른 사진을 넣어 줘.");
+    if (r < 0) throw new Error("사진이 완전히 투명해요. 다른 사진을 넣어 주세요.");
     const out = document.createElement("canvas");
     out.width = r - l + 1;
     out.height = b - t + 1;

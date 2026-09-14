@@ -70,30 +70,29 @@ export default function Home() {
       current.map((p, i) => (i === index ? { ...p, ...changes } : p)),
     );
   }
-  async function upload(file: File | undefined, index: number) {
-    if (!file || uploading.current || busy.current) return;
+  async function upload(files: File[], index: number) {
+    if (!files.length || uploading.current || busy.current) return;
     uploading.current = true;
     setError("");
     setLoading(true);
     setPlaying(false);
     try {
-      const image = await loadPhoto(file);
+      const selected = files.slice(0, 2);
+      const prepared: Photo[] = [];
+      for (const file of selected) {
+        const image = await loadPhoto(file);
+        prepared.push({ image, thumbnail: image.toDataURL(), scale: 1, rotation: 0, flip: false });
+      }
       clearDownload();
-      setPhotos((current) => {
+      setPhotos(current => {
+        if (prepared.length === 2) return prepared;
         const next = [...current];
-        next[index] = {
-          image,
-          thumbnail: image.toDataURL(),
-          scale: 1,
-          rotation: 0,
-          flip: false,
-        };
-        return next;
+        next[Math.min(index, next.length)] = prepared[0];
+        return next.slice(0, 2);
       });
+      if (files.length > 2) setError("사진은 최대 두 장까지 넣을 수 있어요. 먼저 선택한 두 장을 넣었어요.");
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "사진을 읽지 못했어. 다시 선택해 줘.",
-      );
+      setError(e instanceof Error ? e.message : "사진을 읽지 못했어요. 다시 선택해 주세요.");
     } finally {
       uploading.current = false;
       setLoading(false);
@@ -127,7 +126,7 @@ export default function Home() {
       const count = DURATION / 100;
       const fail = () => {
         cancel();
-        setError("GIF 생성에 실패했어. 일반 화질로 다시 시도해 줘.");
+        setError("GIF 생성에 실패했어요. 일반 화질로 다시 시도해 주세요.");
       };
       const next = () => {
         if (index >= count) {
@@ -181,7 +180,7 @@ export default function Home() {
       w.postMessage({ type: "start", data: samples.buffer }, [samples.buffer]);
     } catch {
       cancel();
-      setError("GIF를 준비하지 못했어. 새로고침 후 다시 시도해 줘.");
+      setError("GIF를 준비하지 못했어요. 새로고침 후 다시 시도해 주세요.");
     }
   }
   return (
@@ -199,7 +198,7 @@ export default function Home() {
         <p>
           사진 한 장, 작은 행운 한 스푼.
           <br />
-          나만의 인형뽑기 움짤을 만들어 봐.
+          나만의 인형뽑기 움짤을 만들어 보세요.
         </p>
       </section>
       <div className="studio">
@@ -231,8 +230,8 @@ export default function Home() {
           </div>
           <p className="sample-note">
             {photos.length === 0
-              ? "지금은 샘플 인형이 들어 있어. 아래에서 최애를 넣어 줘!"
-              : "사진은 이 기기에서만 처리되고 서버로 전송되지 않아."}
+              ? "지금은 샘플 인형이 들어 있어요. 아래에서 최애 사진을 넣어 주세요!"
+              : "사진은 이 기기에서만 처리되고 서버로 전송되지 않아요."}
           </p>
         </section>
         <aside className="editor">
@@ -240,8 +239,8 @@ export default function Home() {
             <section className="control-section">
               <div className="section-label">
                 <span className="step">01</span>
-                <h2>경품을 넣어 줘</h2>
-                <span className="small-note">최대 두 명</span>
+                <h2>경품을 넣어 주세요</h2>
+                <span className="small-note">한 번에 최대 두 장</span>
               </div>
               <div className="upload-grid">
                 {Array.from(
@@ -270,9 +269,10 @@ export default function Home() {
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
+                          multiple
                           aria-label={`캐릭터 ${i + 1} 사진 선택`}
                           onChange={(e) => {
-                            upload(e.target.files?.[0], i);
+                            upload(Array.from(e.target.files ?? []), i);
                             e.target.value = "";
                           }}
                         />
@@ -355,7 +355,7 @@ export default function Home() {
               <p className="hint">
                 투명 PNG라면 인형처럼, 배경이 있으면 포토카드처럼.
                 <br />
-                투명 여백은 자동으로 정리해 줄게.
+                투명 여백은 자동으로 정리해 드려요. 사진은 한 번에 두 장까지 선택할 수 있어요.
               </p>
               {loading && <p role="status">사진을 준비하는 중…</p>}
             </section>
@@ -402,7 +402,7 @@ export default function Home() {
                     <span>실패</span>
                   </button>
                 </div>
-                <p className="hint">선택한 결과 그대로 미리보기와 GIF가 만들어져.</p>
+                <p className="hint">선택한 결과 그대로 미리보기와 GIF가 만들어져요.</p>
                 <div className="pile-controls">
                   <div className="pile-controls-heading">
                     <span>인형 배치</span>
@@ -415,12 +415,12 @@ export default function Home() {
                     사진 인형 수 <output>{pileCount}개</output>
                   </label>
                   <input id="pile-count" className="pile-count-slider" type="range"
-                    min="4" max="12" step="4" value={pileCount} disabled={disabled}
+                    min="4" max="12" step="2" value={pileCount} disabled={disabled}
                     onChange={event => { clearDownload(); setPileCount(Number(event.target.value)); }} />
                   <div className="pile-count-ticks" aria-hidden="true">
-                    <span>아담하게</span><span>적당하게</span><span>가득하게</span>
+                    <span>4개</span><span>6개</span><span>8개</span><span>10개</span><span>12개</span>
                   </div>
-                  <p className="hint">앞·뒷줄에 두 사진을 같은 수로 섞어 줘. 기본 인형은 함께 남아 있어.</p>
+                  <p className="hint">두 사진의 전체 개수를 같게 맞추고 앞뒤로 고르게 섞어요. 기본 인형은 뒤쪽에 있어요.</p>
                 </div>
               </section>
             )}
@@ -535,7 +535,7 @@ export default function Home() {
       <footer>
         <span className="wordmark">catchu!</span>
         <p>SMALL THINGS. BIG LOVE.</p>
-        <span>개인적으로 사용 가능한 사진으로 만들어 줘 ♡</span>
+        <span>개인적으로 사용 가능한 사진으로 만들어 주세요 ♡</span>
       </footer>
     </main>
   );
