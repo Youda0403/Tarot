@@ -61,22 +61,44 @@ const ease = (t: number) => {
   return t * t * (3 - 2 * t);
 };
 
-export function pose(time: number, targetX = 240, failed = false) {
+export function makePile(seed = 0, count = 2) {
+  let state = (Math.imul(seed + 1, 2654435761)) >>> 0;
+  const random = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  return [0, 1].flatMap(row => {
+    const ids = count > 1 ? [0, 0, 1, 1] : [0, 0, 0, 0];
+    for (let i = 3; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids.map((photoIndex, col) => ({
+      id: row * 4 + col, row, photoIndex,
+      x: 117 + col * 79 + (random() - 0.5) * 28,
+      y: (row ? 428 : 399) + (random() - 0.5) * 14,
+      rotation: (random() - 0.5) * 0.65,
+      maxW: 61, maxH: 76,
+    }));
+  });
+}
+
+export function pose(time: number, targetX = 240, failed = false, targetY = 383) {
   const t = Math.max(0, time) / 1000;
   let x = targetX,
     y = 188,
     open = 1,
-    prizeY = 383,
+    prizeY = targetY,
     prizeX = targetX,
     held = false,
     result = false;
   if (t < 0.8) x = mix(156, targetX, ease(t / 0.8));
-  else if (t < 1.8) y = mix(188, 335, ease((t - 0.8) / 1));
+  else if (t < 1.8) y = mix(188, targetY - 48, ease((t - 0.8) / 1));
   else if (t < 2.2) {
-    y = 335;
+    y = targetY - 48;
     open = 1 - ease((t - 1.8) / 0.4);
   } else if (t < 3.1) {
-    y = mix(335, 210, ease((t - 2.2) / 0.9));
+    y = mix(targetY - 48, 210, ease((t - 2.2) / 0.9));
     open = 0;
     held = true;
   } else if (t < 3.8) {
@@ -124,8 +146,9 @@ export function renderScene(
   const theme = THEMES[scene.theme] || THEMES[0];
   const failed = scene.outcome === "fail";
   const targetIndex = scene.outcome === 1 && scene.photos[1] ? 1 : 0;
-  const targetX = targetIndex === 0 ? 210 : 274;
-  const p = pose(time, targetX, failed);
+  const pile = makePile(scene.pileSeed, scene.photos.length);
+  const target = pile.find(item => item.photoIndex === targetIndex && item.row === 0)!;
+  const p = pose(time, target.x, failed, target.y);
   const w = ctx.canvas.width;
   ctx.save();
   ctx.scale(w / 480, w / 480);
@@ -310,41 +333,14 @@ export function renderScene(
       i % 3 === 1 ? 1 : 0,
     ),
   );
-  const pileLayouts = [
-    [
-      [112, 411, 58, 72, -0.14],
-      [186, 428, 60, 74, 0.08],
-      [260, 409, 58, 72, -0.08],
-      [340, 426, 60, 74, 0.12],
-    ],
-    [
-      [146, 426, 58, 72, 0.13],
-      [222, 405, 59, 73, -0.08],
-      [300, 428, 58, 72, 0.1],
-      [373, 410, 57, 70, -0.12],
-    ],
-  ] as const;
-  // Each left/right pair contains both photos; swap pairs independently.
-  let randomState = (scene.pileSeed ?? 0) + 1;
-  const random = () => {
-    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
-    return randomState / 4294967296;
-  };
-  const halfSwaps = [random() < 0.5 ? 0 : 1, random() < 0.5 ? 0 : 1];
-  const stockedPhotos = [0, 1, 2, 3].flatMap(pair => {
-    const swap = halfSwaps[Math.floor(pair / 2)];
-    return [0, 1].flatMap(side => {
-      const photo = scene.photos[(side + swap) % scene.photos.length];
-      if (!photo) return [];
-      const [x, y, maxW, maxH, rotation] = pileLayouts[side][pair];
-      return [{photo, x: x + (random() - 0.5) * 8,
-        y: y + (random() - 0.5) * 6, maxW, maxH,
-        rotation: rotation + (random() - 0.5) * 0.16}];
-    });
+  pile.slice().sort((a, b) => a.y - b.y).forEach(item => {
+    const photo = scene.photos[item.photoIndex];
+    if (!photo) return;
+    const moving = item.id === target.id && time >= 2200;
+    if (moving && time >= 2550) return;
+    drawPhoto(photo, moving ? p.prizeX : item.x, moving ? p.prizeY : item.y,
+      item.maxW, item.maxH, item.rotation * (moving ? 1 - ease((time - 2200) / 350) : 1));
   });
-  stockedPhotos.sort((a, b) => a.y - b.y).forEach(({photo, x, y, maxW, maxH, rotation}) =>
-    drawPhoto(photo, x, y, maxW, maxH, rotation),
-  );
   [
     [127, 442, 32, "#efb8bc"],
     [239, 447, 33, "#fff4cc"],
@@ -360,7 +356,7 @@ export function renderScene(
   );
 
   const targetPhoto = scene.photos[targetIndex];
-  if (targetPhoto) {
+  if (targetPhoto && time >= 2550) {
     const droppedFor = Math.max(0, time - 3420);
     const fallingWobble =
       failed && !p.held && droppedFor < 700
@@ -452,7 +448,11 @@ export function renderScene(
   if (p.result) {
     const elapsed = (time - 4550) / 1000;
     const pop = Math.min(1, elapsed / 0.45);
-    const size = 1 + Math.sin(pop * Math.PI) * 0.24;
+    const exit = Math.max(0, Math.min(1, (time - 6150) / 450));
+    const exitScale = exit < 0.25
+      ? 1 + 0.12 * ease(exit / 0.25)
+      : 1.12 * (1 - ease((exit - 0.25) / 0.75));
+    const size = (1 + Math.sin(pop * Math.PI) * 0.24) * exitScale;
     if (failed) {
       ctx.save();
       const gloom = ctx.createLinearGradient(0, 0, 0, 640);
