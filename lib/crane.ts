@@ -279,23 +279,12 @@ export function renderScene(
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.sin(x) * 0.18);
-    if (kind === 1) {
+    if (kind) {
       star(0, 0, size, color);
     } else {
       box(-size * 0.7, -size, size * 1.4, size * 1.6, size * 0.55, color);
-      if (kind === 2) {
-        ctx.fillStyle = color;
-        for (const side of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(side * size * 0.65, -size * 0.45);
-          ctx.lineTo(side * size * 0.62, -size * 1.3);
-          ctx.lineTo(side * size * 0.12, -size * 0.8);
-          ctx.closePath(); ctx.fill();
-        }
-      } else {
       box(-size * 0.65, -size * 1.35, size * 0.45, size * 0.65, 8, color);
       box(size * 0.2, -size * 1.35, size * 0.45, size * 0.65, 8, color);
-      }
     }
     ctx.fillStyle = "#735f65";
     ctx.beginPath();
@@ -344,19 +333,22 @@ export function renderScene(
     ctx.restore();
   };
 
-  // Clear, evenly staggered rows make the cabinet feel fully stocked.
+  // Original bunny and star plushies fill gaps, always behind photo dolls.
   [
-    [110, 374, 31, "#e6bfcf"],
-    [194, 370, 33, "#fff4cc"],
-    [278, 372, 31, "#d2c4e6"],
-    [365, 374, 32, "#c1d8c3"],
-  ].forEach((a, i) =>
+    [104, 407, 27, "#e6bfcf", 0],
+    [146, 392, 26, "#fff4cc", 1],
+    [192, 414, 28, "#c1d8c3", 0],
+    [239, 391, 27, "#d2c4e6", 1],
+    [287, 412, 27, "#efb8bc", 0],
+    [334, 393, 26, "#fff4cc", 1],
+    [377, 409, 27, "#c1d8c3", 0],
+  ].forEach(a =>
     plush(
       a[0] as number,
       a[1] as number,
       a[2] as number,
       a[3] as string,
-      i % 2 === 0 ? 2 : 0,
+      a[4] as number,
     ),
   );
   const drawClaw = () => {

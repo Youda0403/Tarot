@@ -72,12 +72,18 @@ export default function Home() {
   }
   async function upload(files: File[], index: number) {
     if (!files.length || uploading.current || busy.current) return;
+    if (files.length > 2) {
+      const notice = "사진은 두 장까지만 선택할 수 있어요. 선택창에서 두 장만 골라 다시 확인해 주세요.";
+      setError(notice);
+      window.alert(notice);
+      return;
+    }
     uploading.current = true;
     setError("");
     setLoading(true);
     setPlaying(false);
     try {
-      const selected = files.slice(0, 2);
+      const selected = files;
       const prepared: Photo[] = [];
       for (const file of selected) {
         const image = await loadPhoto(file);
@@ -90,7 +96,6 @@ export default function Home() {
         next[Math.min(index, next.length)] = prepared[0];
         return next.slice(0, 2);
       });
-      if (files.length > 2) setError("사진은 최대 두 장까지 넣을 수 있어요. 먼저 선택한 두 장을 넣었어요.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "사진을 읽지 못했어요. 다시 선택해 주세요.");
     } finally {
@@ -355,7 +360,7 @@ export default function Home() {
               <p className="hint">
                 투명 PNG라면 인형처럼, 배경이 있으면 포토카드처럼.
                 <br />
-                투명 여백은 자동으로 정리해 드려요. 사진은 한 번에 두 장까지 선택할 수 있어요.
+                투명 여백은 자동으로 정리해 드려요. 휴대폰 선택창에서는 사진을 두 장까지만 체크해 주세요.
               </p>
               {loading && <p role="status">사진을 준비하는 중…</p>}
             </section>
@@ -398,7 +403,7 @@ export default function Home() {
                       setOutcome("fail");
                     }}
                   >
-                    <span className="fail-claw">⌄</span>
+                    <span className="fail-claw">×</span>
                     <span>실패</span>
                   </button>
                 </div>
