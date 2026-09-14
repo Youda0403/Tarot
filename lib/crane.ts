@@ -50,7 +50,7 @@ export type Scene = {
   message: string;
   outcome: Outcome;
 };
-export const DURATION = 8000;
+export const DURATION = 6800;
 const mix = (a: number, b: number, t: number) =>
   a + (b - a) * Math.max(0, Math.min(1, t));
 const ease = (t: number) => {
@@ -72,26 +72,24 @@ export function pose(time: number, targetX = 240, failed = false) {
   else if (t < 2.2) {
     y = 335;
     open = 1 - ease((t - 1.8) / 0.4);
-  } else if (failed && t < 2.95) {
-    y = mix(335, 248, ease((t - 2.2) / 0.75));
-    open = 0;
-    held = true;
-  } else if (failed) {
-    x = mix(targetX, 156, ease((t - 3.5) / 1.1));
-    y = mix(248, 188, ease((t - 2.95) / 0.8));
-    open = ease((t - 2.95) / 0.22);
-    const fall = Math.max(0, (t - 2.95) / 0.55);
-    prizeY = fall < 1 ? mix(296, 383, fall * fall) : 383 - Math.sin(Math.min(1, (fall - 1) * 2) * Math.PI) * 7;
-    result = t >= 3.5;
   } else if (t < 3.1) {
     y = mix(335, 210, ease((t - 2.2) / 0.9));
     open = 0;
     held = true;
   } else if (t < 3.8) {
-    x = mix(targetX, 325, ease((t - 3.1) / 0.7));
+    x = mix(targetX, failed ? 279 : 325, ease((t - 3.1) / 0.7));
     y = 210;
     open = 0;
     held = true;
+  } else if (failed) {
+    x = mix(279, 156, ease((t - 4.4) / 1.2));
+    y = mix(210, 188, ease((t - 4.4) / 0.6));
+    open = ease((t - 3.8) / 0.3);
+    const fall = Math.max(0, (t - 3.8) / 0.6);
+    prizeX = mix(279, 258, ease(fall));
+    prizeY = mix(258, 398, fall * fall);
+    if (fall >= 1) prizeY -= Math.sin(Math.min(1, (t - 4.4) / 0.35) * Math.PI) * 7;
+    result = t >= 4.4;
   } else {
     x = mix(325, 156, ease((t - 4.6) / 1.2));
     y = mix(210, 188, ease((t - 4.6) / 0.6));
@@ -193,7 +191,10 @@ export function renderScene(
       ctx.arc(x, y, 1.5, 0, 7);
       ctx.fill();
     }
-  text("A LITTLE LUCK, A LOT OF LOVE", 240, 30, 10, theme.dark);
+  // Reserve a generous space above the cabinet for the result lettering.
+  ctx.save();
+  ctx.translate(24, 58);
+  ctx.scale(0.9, 0.9);
   ctx.fillStyle = "#dfd2c6";
   ctx.beginPath();
   ctx.ellipse(240, 603, 182, 13, 0, 0, 7);
@@ -210,7 +211,7 @@ export function renderScene(
     ctx.fill();
   }
   text(scene.title.trim() || "CATCH ME!", 236, 113, 29, theme.dark, 300);
-  text("♡  YOUR FAVORITE, NOW A PRIZE  ♡", 236, 134, 8, theme.dark);
+  text("♡  YOUR FAVORITE, NOW A PRIZE  ♡", 236, 134, 11, theme.dark);
   box(72, 161, 328, 296, 16, theme.dark);
   box(81, 170, 310, 277, 9, theme.light);
   ctx.save();
@@ -286,18 +287,26 @@ export function renderScene(
   };
 
   // The uploaded cutouts repeat through the pile like stocked character dolls.
+  ctx.save();
+  ctx.filter = "blur(2px)";
+  ctx.globalAlpha = 0.45;
+  for (let i = 0; i < 9; i++) {
+    const photo = scene.photos[i % Math.max(1, scene.photos.length)];
+    if (photo) drawPhoto(photo, 109 + i * 32, 368 + (i % 3) * 9, 56, 68, Math.sin(i * 3) * 0.2);
+  }
+  ctx.restore();
   plush(104, 395, 24, "#e6bfcf");
   plush(363, 397, 26, "#fff4cc", 1);
   const pileLayouts = [
     [
-      [132, 418, 61, 76, -0.14],
-      [218, 432, 70, 84, 0.08],
-      [340, 414, 59, 73, -0.11],
+      [119, 414, 61, 76, -0.14],
+      [218, 424, 61, 76, 0.08],
+      [355, 404, 59, 73, -0.11],
     ],
     [
-      [158, 405, 59, 72, 0.13],
-      [278, 430, 69, 83, -0.08],
-      [365, 430, 57, 69, 0.15],
+      [166, 410, 59, 72, 0.13],
+      [269, 427, 61, 76, -0.08],
+      [378, 430, 57, 69, 0.15],
     ],
   ] as const;
   scene.photos.forEach((photo, photoIndex) =>
@@ -327,8 +336,17 @@ export function renderScene(
     drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, swing);
   }
   // Visible mouth of the chute, aligned with the retrieval bay below.
-  box(291, 417, 69, 30, 5, "#443d4e", theme.dark);
-  line(294, 418, 357, 418, "#fff9ea", 3);
+  const metal = ctx.createLinearGradient(291, 413, 360, 447);
+  metal.addColorStop(0, "#f6f8fa");
+  metal.addColorStop(0.4, "#aab3bd");
+  metal.addColorStop(0.65, "#e0e5e9");
+  metal.addColorStop(1, "#7c8793");
+  box(288, 411, 76, 36, 2, "#9ca6b0", "#73808d");
+  ctx.fillStyle = metal;
+  ctx.fillRect(291, 414, 70, 30);
+  box(297, 419, 58, 17, 1, "#3e4751");
+  line(291, 414, 361, 414, "#fff", 2);
+  line(299, 439, 357, 439, "#eef2f6", 2);
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
   const spread = 12 + p.open * 17;
@@ -381,7 +399,21 @@ export function renderScene(
   ctx.beginPath();
   ctx.ellipse(340, 471, 22, 12, 0, 0, 7);
   ctx.stroke();
-  text("DROP", 340, 475, 9, theme.dark);
+  // Metal retaining ring, cylindrical wall, inset illuminated cap and highlight.
+  const ellipse = (y: number, rx: number, ry: number, fill: string | CanvasGradient) => {
+    ctx.beginPath(); ctx.ellipse(340, y, rx, ry, 0, 0, 7);
+    ctx.fillStyle = fill; ctx.fill();
+  };
+  ellipse(480, 28, 14, "#81838d");
+  ellipse(477, 27, 13, "#e6e8ed");
+  box(317, 466, 46, 12, 5, "#ad793d");
+  ellipse(477, 23, 11, "#ad793d");
+  const cap = ctx.createLinearGradient(0, 453, 0, 477);
+  cap.addColorStop(0, "#fff5b8"); cap.addColorStop(0.5, "#f5d16e"); cap.addColorStop(1, "#d69a42");
+  ellipse(466, 23, 12, cap);
+  ctx.beginPath(); ctx.ellipse(340, 464, 18, 8, 0, Math.PI, Math.PI * 2);
+  ctx.strokeStyle = "#fff9d9"; ctx.lineWidth = 2; ctx.stroke();
+  text("DROP", 340, 470, 10, "#755326");
   box(102, 519, 58, 43, 6, theme.light, theme.dark);
   box(127, 525, 6, 22, 2, theme.dark);
   text("COIN", 131, 558, 8, theme.dark);
@@ -399,40 +431,42 @@ export function renderScene(
     ctx.fillStyle = "#332d3b55";
     ctx.fillRect(250, 567, 127, 6);
   }
+  text("CATCHU!  /  POCKET ARCADE", 240, 625, 9, theme.dark);
+  ctx.restore();
   if (p.result) {
-    const elapsed = (time - (failed ? 3500 : 4600)) / 1000;
+    const elapsed = (time - (failed ? 4400 : 4600)) / 1000;
     const pop = Math.min(1, elapsed / 0.45);
     const size = 1 + Math.sin(pop * Math.PI) * 0.24;
     ctx.save();
-    ctx.translate(240, 289 - ease(pop) * 12);
+    ctx.translate(240, 70 - ease(pop) * 8);
+    ctx.rotate(-0.06);
     ctx.scale(size, size);
-    ctx.font = "900 38px sans-serif";
+    ctx.font = 'italic 900 42px "Arial Black", "DejaVu Sans", sans-serif';
     ctx.textAlign = "center";
     ctx.lineJoin = "round";
     ctx.lineWidth = 7;
     ctx.strokeStyle = "#fff9e9";
-    ctx.strokeText(scene.message.trim() || (failed ? "OOPS!" : "GET!"), 0, 0, 260);
-    text(
-      scene.message.trim() || (failed ? "OOPS!" : "GET!"),
-      0,
-      0,
-      38,
-      theme.dark,
-      260,
-    );
+    const message = scene.message.trim() || (failed ? "Fail" : "GET!");
+    ctx.strokeText(message, 0, 0, 270);
+    ctx.fillStyle = theme.dark;
+    ctx.fillText(message, 0, 0, 270);
     ctx.restore();
     for (let i = 0; i < (failed ? 6 : 14); i++) {
       const q = ease(Math.min(1, elapsed / 0.55));
       const angle = (i / (failed ? 6 : 14)) * Math.PI * 2;
       star(
         240 + Math.cos(angle) * (60 + q * 68),
-        270 + Math.sin(angle) * (25 + q * 35),
+        51 + Math.sin(angle) * (10 + q * 20),
         ((failed ? 2 : 3) + (i % 3)) * (0.7 + 0.3 * Math.sin(elapsed * 5 + i)),
         failed ? "#b6a9ae" : i % 2 ? theme.dark : "#e3b655",
       );
     }
   }
-  text("CATCHU!  /  POCKET ARCADE", 240, 625, 9, theme.dark);
+  ctx.beginPath();
+  ctx.roundRect(9, 9, 462, 622, 25);
+  ctx.strokeStyle = theme.body;
+  ctx.lineWidth = 3;
+  ctx.stroke();
   ctx.restore();
 }
 

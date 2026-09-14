@@ -209,7 +209,7 @@ export default function Home() {
             >
               {playing ? "Ⅱ 정지" : "▷ 뽑아보기"}
             </button>
-            <span>8초의 작은 행복 · 반복 재생</span>
+            <span>6.8초의 작은 행복 · 반복 재생</span>
           </div>
           <p className="sample-note">
             {photos.length === 0
@@ -435,7 +435,7 @@ export default function Home() {
                 <input
                   maxLength={12}
                   value={message}
-                  placeholder={outcome === "fail" ? "TRY AGAIN!" : "GET!"}
+                  placeholder={outcome === "fail" ? "Fail" : "GET!"}
                   onChange={(e) => {
                     clearDownload();
                     setMessage(e.target.value);
