@@ -34,6 +34,8 @@ export const THEMES = [
     dark: "#3e4565",
     light: "#e4e6f1",
   },
+  { name: "Apricot", label: "살구크림", body: "#edb58c", dark: "#a56b4e", light: "#fff0df" },
+  { name: "Forest", label: "숲속녹차", body: "#526e64", dark: "#30493f", light: "#e2eee5" },
 ];
 export type Photo = {
   image: HTMLCanvasElement;
@@ -321,10 +323,12 @@ export function renderScene(
       [373, 410, 57, 70, -0.12],
     ],
   ] as const;
-  scene.photos.forEach((photo, photoIndex) =>
-    pileLayouts[photoIndex].forEach(([x, y, maxW, maxH, rotation]) =>
-      drawPhoto(photo, x, y, maxW, maxH, rotation),
-    ),
+  const stockedPhotos = scene.photos.flatMap((photo, photoIndex) =>
+    pileLayouts[photoIndex].map(([x, y, maxW, maxH, rotation]) =>
+      ({photo, x, y, maxW, maxH, rotation})),
+  );
+  stockedPhotos.sort((a, b) => a.y - b.y).forEach(({photo, x, y, maxW, maxH, rotation}) =>
+    drawPhoto(photo, x, y, maxW, maxH, rotation),
   );
   [
     [127, 442, 32, "#efb8bc"],
@@ -351,7 +355,13 @@ export function renderScene(
     drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, swing);
   }
   // Visible mouth of the chute, aligned with the retrieval bay below.
-  box(288, 411, 76, 36, 4, "#b9bdc5", theme.dark);
+  ctx.beginPath();
+  ctx.roundRect(288, 405, 76, 70, [7, 7, 0, 0]);
+  ctx.fillStyle = "#b9bdc5";
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 2;
+  ctx.stroke();
   line(293, 415, 359, 415, "#f7f5f0", 2);
   line(299, 440, 354, 440, "#e4e3e7", 2);
   line(p.x, 185, p.x, p.y, "#958d91", 4);
@@ -403,7 +413,10 @@ export function renderScene(
   ctx.strokeStyle = theme.light;
   ctx.lineWidth = 2;
   ctx.stroke();
-  text("DROP", 340, 476, 10, theme.dark);
+  const rgb = [1, 3, 5].map(start => parseInt(theme.body.slice(start, start + 2), 16) / 255)
+    .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  text("DROP", 340, 476, 10, luminance < 0.3 ? "#ffffff" : theme.dark);
   box(102, 519, 58, 43, 6, theme.light, theme.dark);
   box(127, 525, 6, 22, 2, theme.dark);
   text("COIN", 131, 558, 8, theme.dark);
@@ -440,17 +453,38 @@ export function renderScene(
       ctx.restore();
     }
     const customMessage = scene.message.trim();
-    const resultX = customMessage ? 240 : 378;
-    const resultY = customMessage ? 235 : 178;
+    if (!failed) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(81, 170, 310, 277, 9);
+      ctx.clip();
+      for (let burst = 0; burst < 3; burst++) {
+        const age = elapsed - burst * 0.22;
+        if (age < 0) continue;
+        const progress = Math.min(1, age / 1.6);
+        ctx.globalAlpha = 1 - progress;
+        for (let i = 0; i < 14; i++) {
+          const angle = i / 14 * Math.PI * 2;
+          const radius = (1 - (1 - progress) ** 3) * (65 + burst * 10);
+          star(145 + burst * 90 + Math.cos(angle) * radius,
+            275 - burst * 16 + Math.sin(angle) * radius + progress * progress * 55,
+            (3 + i % 3) * (1 - progress * 0.5),
+            ["#fff9e2", "#efc56c", theme.body][i % 3]);
+        }
+      }
+      ctx.restore();
+    }
+    const resultX = customMessage ? 240 : 366;
+    const resultY = customMessage ? 250 : 218;
     ctx.save();
     ctx.translate(resultX, resultY - ease(pop) * 5);
     ctx.scale(size, size);
-    const bubbleW = customMessage ? 250 : 126;
+    const bubbleW = customMessage ? 270 : 150;
     ctx.beginPath();
     for (let i = 0; i < 24; i++) {
       const angle = i / 24 * Math.PI * 2;
       const radius = i % 2 ? 0.82 : 1;
-      ctx.lineTo(Math.cos(angle) * bubbleW / 2 * radius, -10 + Math.sin(angle) * 29 * radius);
+      ctx.lineTo(Math.cos(angle) * bubbleW / 2 * radius, -10 + Math.sin(angle) * 35 * radius);
     }
     ctx.closePath();
     ctx.fillStyle = failed ? "#e5edf9" : "#fff4cb";
@@ -467,16 +501,6 @@ export function renderScene(
     ctx.fillStyle = failed ? "#506991" : theme.dark;
     ctx.fillText(message, 0, 0, bubbleW - 24);
     ctx.restore();
-    for (let i = 0; i < (failed ? 0 : 10); i++) {
-      const q = ease(Math.min(1, elapsed / 0.55));
-      const angle = (i / (failed ? 6 : 10)) * Math.PI * 2;
-      star(
-        resultX + Math.cos(angle) * (24 + q * 28),
-        resultY - 5 + Math.sin(angle) * (10 + q * 17),
-        ((failed ? 2 : 3) + (i % 3)) * (0.7 + 0.3 * Math.sin(elapsed * 5 + i)),
-        failed ? "#b6a9ae" : i % 2 ? theme.dark : "#e3b655",
-      );
-    }
   }
   ctx.restore();
 }
