@@ -15,6 +15,7 @@ export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]),
     [outcome, setOutcome] = useState<Outcome>(0),
     [theme, setTheme] = useState(0),
+    [pileSeed, setPileSeed] = useState(0),
     [title, setTitle] = useState("CATCH ME!"),
     [message, setMessage] = useState("");
   const [playing, setPlaying] = useState(false),
@@ -28,7 +29,7 @@ export default function Home() {
     downloadRef = useRef(""),
     busy = useRef(false),
     uploading = useRef(false);
-  const scene: Scene = { photos, theme, title, message, outcome };
+  const scene: Scene = { photos, theme, title, message, outcome, pileSeed };
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const disabled = progress !== null;
@@ -48,7 +49,7 @@ export default function Home() {
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playing, photos, theme, title, message, outcome]);
+  }, [playing, photos, theme, title, message, outcome, pileSeed]);
   useEffect(
     () => () => {
       worker.current?.terminate();
@@ -163,7 +164,19 @@ export default function Home() {
           cancel();
         }
       };
-      w.postMessage({ type: "start" });
+      // Sample the entire animation, including the blue failure overlay,
+      // so every exported frame uses the same color mapping.
+      const sampleCanvas = document.createElement("canvas");
+      sampleCanvas.width = 240;
+      sampleCanvas.height = 320;
+      const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true })!;
+      const sampleTimes = [0, 1200, 2400, 3300, 3900, 4700, 5100, 5900];
+      const samples = new Uint8Array(240 * 320 * 4 * sampleTimes.length);
+      sampleTimes.forEach((time, i) => {
+        renderScene(sampleCtx, frozen, time);
+        samples.set(sampleCtx.getImageData(0, 0, 240, 320).data, i * 240 * 320 * 4);
+      });
+      w.postMessage({ type: "start", data: samples.buffer }, [samples.buffer]);
     } catch {
       cancel();
       setError("GIF를 준비하지 못했어. 새로고침 후 다시 시도해 줘.");
@@ -385,6 +398,11 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="hint">선택한 결과 그대로 미리보기와 GIF가 만들어져.</p>
+                <button type="button" disabled={disabled} onClick={() => {
+                  clearDownload();
+                  setPileSeed(seed => seed + 1);
+                }}>↻ 인형 다시 섞기</button>
+                <p className="hint">두 사진의 수와 좌우 균형을 맞춰 골고루 섞어 줘.</p>
               </section>
             )}
             <section className="control-section">

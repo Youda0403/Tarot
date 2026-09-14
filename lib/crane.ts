@@ -51,6 +51,7 @@ export type Scene = {
   title: string;
   message: string;
   outcome: Outcome;
+  pileSeed?: number;
 };
 export const DURATION = 6800;
 const mix = (a: number, b: number, t: number) =>
@@ -323,10 +324,24 @@ export function renderScene(
       [373, 410, 57, 70, -0.12],
     ],
   ] as const;
-  const stockedPhotos = scene.photos.flatMap((photo, photoIndex) =>
-    pileLayouts[photoIndex].map(([x, y, maxW, maxH, rotation]) =>
-      ({photo, x, y, maxW, maxH, rotation})),
-  );
+  // Each left/right pair contains both photos; swap pairs independently.
+  let randomState = (scene.pileSeed ?? 0) + 1;
+  const random = () => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return randomState / 4294967296;
+  };
+  const halfSwaps = [random() < 0.5 ? 0 : 1, random() < 0.5 ? 0 : 1];
+  const stockedPhotos = [0, 1, 2, 3].flatMap(pair => {
+    const swap = halfSwaps[Math.floor(pair / 2)];
+    return [0, 1].flatMap(side => {
+      const photo = scene.photos[(side + swap) % scene.photos.length];
+      if (!photo) return [];
+      const [x, y, maxW, maxH, rotation] = pileLayouts[side][pair];
+      return [{photo, x: x + (random() - 0.5) * 8,
+        y: y + (random() - 0.5) * 6, maxW, maxH,
+        rotation: rotation + (random() - 0.5) * 0.16}];
+    });
+  });
   stockedPhotos.sort((a, b) => a.y - b.y).forEach(({photo, x, y, maxW, maxH, rotation}) =>
     drawPhoto(photo, x, y, maxW, maxH, rotation),
   );
@@ -356,14 +371,13 @@ export function renderScene(
   }
   // Visible mouth of the chute, aligned with the retrieval bay below.
   ctx.beginPath();
-  ctx.roundRect(288, 405, 76, 70, [7, 7, 0, 0]);
+  ctx.roundRect(288, 418, 76, 57, [5, 5, 0, 0]);
   ctx.fillStyle = "#b9bdc5";
   ctx.fill();
   ctx.strokeStyle = theme.dark;
   ctx.lineWidth = 2;
   ctx.stroke();
-  line(293, 415, 359, 415, "#f7f5f0", 2);
-  line(299, 440, 354, 440, "#e4e3e7", 2);
+  line(294, 422, 358, 422, "#f7f5f0", 2);
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
   const spread = 12 + p.open * 17;
@@ -474,12 +488,12 @@ export function renderScene(
       }
       ctx.restore();
     }
-    const resultX = customMessage ? 240 : 366;
-    const resultY = customMessage ? 250 : 218;
+    const resultX = 366;
+    const resultY = 218;
     ctx.save();
     ctx.translate(resultX, resultY - ease(pop) * 5);
     ctx.scale(size, size);
-    const bubbleW = customMessage ? 270 : 150;
+    const bubbleW = 150;
     ctx.beginPath();
     for (let i = 0; i < 24; i++) {
       const angle = i / 24 * Math.PI * 2;
