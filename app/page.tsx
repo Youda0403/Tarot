@@ -17,6 +17,7 @@ export default function Home() {
     [theme, setTheme] = useState(0),
     [pileSeed, setPileSeed] = useState(0),
     [pileCount, setPileCount] = useState(8),
+    [pickSeed, setPickSeed] = useState(0),
     [title, setTitle] = useState("CATCH ME!"),
     [message, setMessage] = useState("");
   const [playing, setPlaying] = useState(false),
@@ -30,7 +31,7 @@ export default function Home() {
     downloadRef = useRef(""),
     busy = useRef(false),
     uploading = useRef(false);
-  const scene: Scene = { photos, theme, title, message, outcome, pileSeed, pileCount };
+  const scene: Scene = { photos, theme, title, message, outcome, pileSeed, pileCount, pickSeed };
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const disabled = progress !== null;
@@ -50,7 +51,7 @@ export default function Home() {
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playing, photos, theme, title, message, outcome, pileSeed, pileCount]);
+  }, [playing, photos, theme, title, message, outcome, pileSeed, pileCount, pickSeed]);
   useEffect(
     () => () => {
       worker.current?.terminate();
@@ -218,7 +219,10 @@ export default function Home() {
           <div className="preview-actions">
             <button
               className="play-button"
-              onClick={() => setPlaying(!playing)}
+              onClick={() => {
+                if (!playing) { clearDownload(); setPickSeed(Math.floor(Math.random() * 1000000)); }
+                setPlaying(!playing);
+              }}
               disabled={disabled}
             >
               {playing ? "Ⅱ 정지" : "▷ 뽑아보기"}

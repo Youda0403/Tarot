@@ -53,6 +53,7 @@ export type Scene = {
   outcome: Outcome;
   pileSeed?: number;
   pileCount?: number;
+  pickSeed?: number;
 };
 export const DURATION = 6800;
 const mix = (a: number, b: number, t: number) =>
@@ -69,7 +70,7 @@ export function makePile(seed = 0, count = 2, total = 8) {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     return state / 4294967296;
   };
-  return [0, 1].flatMap(row => {
+  const layout = [0, 1].flatMap(row => {
     const ids = Array.from({ length: columns }, (_, i) => count > 1 ? i % 2 : 0);
     for (let i = columns - 1; i > 0; i--) {
       const j = Math.floor(random() * (i + 1));
@@ -77,12 +78,22 @@ export function makePile(seed = 0, count = 2, total = 8) {
     }
     return ids.map((photoIndex, col) => ({
       id: row * columns + col, row, photoIndex,
-      x: 117 + col * (237 / (columns - 1)) + (random() - 0.5) * 20,
-      y: (row ? 428 : 399) + (random() - 0.5) * 14,
+      x: columns === 2 ? 165 + (col * 2 + row) * 47 + (random() - 0.5) * 8
+        : 117 + col * (237 / (columns - 1)) + (random() - 0.5) * 20,
+      y: (columns === 2 ? 416 + row * 5 : row ? 428 : 399) + (random() - 0.5) * (columns === 2 ? 4 : 14),
       rotation: (random() - 0.5) * 0.65,
       maxW: 61, maxH: 76,
     }));
   });
+  // Keep each uploaded character eligible on the left without changing row totals.
+  if (count > 1) for (const photoIndex of [0, 1]) {
+    if (!layout.some(item => item.x < 240 && item.photoIndex === photoIndex)) {
+      const left = layout.find(item => item.x < 240)!;
+      const right = layout.find(item => item.row === left.row && item.photoIndex === photoIndex)!;
+      [left.photoIndex, right.photoIndex] = [right.photoIndex, left.photoIndex];
+    }
+  }
+  return layout;
 }
 
 export function pose(time: number, targetX = 240, failed = false, targetY = 383) {
@@ -149,7 +160,9 @@ export function renderScene(
   const failed = scene.outcome === "fail";
   const targetIndex = scene.outcome === 1 && scene.photos[1] ? 1 : 0;
   const pile = makePile(scene.pileSeed, scene.photos.length, scene.pileCount);
-  const target = pile.find(item => item.photoIndex === targetIndex && item.row === 0)!;
+  const candidates = pile.filter(item => item.photoIndex === targetIndex && item.x < 240);
+  const selection = (Math.imul((scene.pickSeed ?? 0) + 1, 2654435761) >>> 0) / 4294967296;
+  const target = candidates[Math.floor(selection * candidates.length)] || pile[0];
   const p = pose(time, target.x, failed, target.y);
   const w = ctx.canvas.width;
   ctx.save();
@@ -352,40 +365,35 @@ export function renderScene(
     line(p.x + side * 10, p.y + 8, p.x + side * spread, p.y + 33, "#fff8e9", 2);
   }
   };
-  let clawDrawn = false;
+  const targetPhoto = scene.photos[targetIndex];
+  const drawRig = () => {
+    if (targetPhoto) {
+      const droppedFor = Math.max(0, time - 3420);
+      const wobble = failed && !p.held && droppedFor < 700
+        ? Math.sin(droppedFor / 65) * 0.18 * (1 - ease(droppedFor / 700)) : 0;
+      const straightening = ease((time - 2200) / 350);
+      const rotation = time < 2200 ? target.rotation
+        : target.rotation * (1 - straightening) +
+          (p.held ? Math.sin(time / 170) * 0.045 : wobble) * straightening;
+      drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, rotation);
+    }
+    // Always draw fingers in front of the held doll, as one depth group.
+    drawClaw();
+  };
+  let rigDrawn = false;
   pile.slice().sort((a, b) => a.y - b.y).forEach(item => {
-    if (item.row === 1 && !clawDrawn) { drawClaw(); clawDrawn = true; }
+    if (!rigDrawn && item.y >= target.y) { drawRig(); rigDrawn = true; }
+    if (item.id === target.id) return;
     const photo = scene.photos[item.photoIndex];
-    if (!photo) return;
-    const moving = item.id === target.id && time >= 2200;
-    if (moving && time >= 2550) return;
-    drawPhoto(photo, moving ? p.prizeX : item.x, moving ? p.prizeY : item.y,
-      item.maxW, item.maxH, item.rotation * (moving ? 1 - ease((time - 2200) / 350) : 1));
+    if (photo) drawPhoto(photo, item.x, item.y, item.maxW, item.maxH, item.rotation);
   });
+  if (!rigDrawn) drawRig();
   [
     [127, 442, 32, "#efb8bc"],
     [239, 447, 33, "#fff4cc"],
     [375, 451, 30, "#c1d8c3"],
-  ].forEach((a, i) =>
-    plush(
-      a[0] as number,
-      a[1] as number,
-      a[2] as number,
-      a[3] as string,
-      i % 2,
-    ),
-  );
+  ].forEach((a, i) => plush(a[0] as number, a[1] as number, a[2] as number, a[3] as string, i % 2));
 
-  const targetPhoto = scene.photos[targetIndex];
-  if (targetPhoto && time >= 2550) {
-    const droppedFor = Math.max(0, time - 3420);
-    const fallingWobble =
-      failed && !p.held && droppedFor < 700
-        ? Math.sin(droppedFor / 65) * 0.18 * (1 - ease(droppedFor / 700))
-        : 0;
-    const swing = p.held ? Math.sin(time / 170) * 0.045 : fallingWobble;
-    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, swing);
-  }
   // Visible mouth of the chute, aligned with the retrieval bay below.
   ctx.beginPath();
   ctx.roundRect(288, 418, 76, 57, [5, 5, 0, 0]);
