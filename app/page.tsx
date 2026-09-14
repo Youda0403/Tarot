@@ -5,6 +5,7 @@ import {
   THEMES,
   loadPhoto,
   renderScene,
+  type Outcome,
   type Photo,
   type Scene,
 } from "@/lib/crane";
@@ -12,6 +13,7 @@ export type Tone = "soft" | "standard" | "sharp";
 
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]),
+    [outcome, setOutcome] = useState<Outcome>(0),
     [theme, setTheme] = useState(0),
     [title, setTitle] = useState("CATCH ME!"),
     [message, setMessage] = useState("");
@@ -26,7 +28,7 @@ export default function Home() {
     downloadRef = useRef(""),
     busy = useRef(false),
     uploading = useRef(false);
-  const scene: Scene = { photos, theme, title, message };
+  const scene: Scene = { photos, theme, title, message, outcome };
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const disabled = progress !== null;
@@ -46,7 +48,7 @@ export default function Home() {
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playing, photos, theme, title, message]);
+  }, [playing, photos, theme, title, message, outcome]);
   useEffect(
     () => () => {
       worker.current?.terminate();
@@ -79,7 +81,6 @@ export default function Home() {
         next[index] = {
           image,
           thumbnail: image.toDataURL(),
-          name: current[index]?.name || "",
           scale: 1,
           rotation: 0,
           flip: false,
@@ -236,7 +237,7 @@ export default function Home() {
                       >
                         {photos[i] ? (
                           <img
-                        src={photos[i].thumbnail}
+                            src={photos[i].thumbnail}
                             alt={`캐릭터 ${i + 1}`}
                           />
                         ) : (
@@ -263,16 +264,6 @@ export default function Home() {
                       </label>
                       {photos[i] && (
                         <>
-                          <input
-                            className="name-input"
-                            aria-label={`캐릭터 ${i + 1} 이름`}
-                            maxLength={12}
-                            placeholder="이름 (선택)"
-                            value={photos[i].name}
-                            onChange={(e) =>
-                              changePhoto(i, { name: e.target.value })
-                            }
-                          />
                           <details>
                             <summary>크기·방향 조절</summary>
                             <label className="slider-label">
@@ -330,6 +321,9 @@ export default function Home() {
                               setPhotos((current) =>
                                 current.filter((_, j) => j !== i),
                               );
+                              setOutcome((current) =>
+                                current === "fail" ? "fail" : 0,
+                              );
                             }}
                           >
                             삭제
@@ -347,9 +341,55 @@ export default function Home() {
               </p>
               {loading && <p role="status">사진을 준비하는 중…</p>}
             </section>
+            {photos.length > 0 && (
+              <section className="control-section">
+                <div className="section-label">
+                  <span className="step">02</span>
+                  <h2>이번 판의 결과</h2>
+                  <span className="small-note">하나만 선택</span>
+                </div>
+                <div className="result-options">
+                  {photos.map((photo, i) => (
+                    <button
+                      key={i}
+                      className={
+                        "result-card " + (outcome === i ? "selected" : "")
+                      }
+                      aria-pressed={outcome === i}
+                      aria-label={`사진 ${i + 1} 뽑기`}
+                      onClick={() => {
+                        clearDownload();
+                        setOutcome(i as 0 | 1);
+                      }}
+                    >
+                      <span className="result-thumb">
+                        <img src={photo.thumbnail} alt="" />
+                      </span>
+                      <span>{photos.length === 1 ? "이 인형" : `사진 ${i + 1}`}</span>
+                    </button>
+                  ))}
+                  <button
+                    className={
+                      "result-card fail-card " +
+                      (outcome === "fail" ? "selected" : "")
+                    }
+                    aria-pressed={outcome === "fail"}
+                    aria-label="이번 판 실패"
+                    onClick={() => {
+                      clearDownload();
+                      setOutcome("fail");
+                    }}
+                  >
+                    <span className="fail-claw">⌄</span>
+                    <span>실패</span>
+                  </button>
+                </div>
+                <p className="hint">선택한 결과 그대로 미리보기와 GIF가 만들어져.</p>
+              </section>
+            )}
             <section className="control-section">
               <div className="section-label">
-                <span className="step">02</span>
+                <span className="step">03</span>
                 <h2>기계의 색</h2>
                 <span className="small-note">{THEMES[theme].label}</span>
               </div>
@@ -374,7 +414,7 @@ export default function Home() {
             </section>
             <section className="control-section">
               <div className="section-label">
-                <span className="step">03</span>
+                <span className="step">04</span>
                 <h2>작은 한마디</h2>
                 <span className="small-note">선택</span>
               </div>
@@ -395,7 +435,7 @@ export default function Home() {
                 <input
                   maxLength={12}
                   value={message}
-                  placeholder={photos.length === 2 ? "DOUBLE GET!" : "GET!"}
+                  placeholder={outcome === "fail" ? "TRY AGAIN!" : "GET!"}
                   onChange={(e) => {
                     clearDownload();
                     setMessage(e.target.value);

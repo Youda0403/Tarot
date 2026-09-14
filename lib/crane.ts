@@ -38,16 +38,17 @@ export const THEMES = [
 export type Photo = {
   image: HTMLCanvasElement;
   thumbnail: string;
-  name: string;
   scale: number;
   rotation: number;
   flip: boolean;
 };
+export type Outcome = 0 | 1 | "fail";
 export type Scene = {
   photos: Photo[];
   theme: number;
   title: string;
   message: string;
+  outcome: Outcome;
 };
 export const DURATION = 6000;
 const mix = (a: number, b: number, t: number) =>
@@ -57,41 +58,47 @@ const ease = (t: number) => {
   return t * t * (3 - 2 * t);
 };
 
-export function pose(time: number) {
+export function pose(time: number, targetX = 240, failed = false) {
   const t = Math.max(0, time) / 1000;
-  let x = 240,
+  let x = targetX,
     y = 188,
     open = 1,
-    prizeY = 402,
-    prizeX = 240,
+    prizeY = 365,
+    prizeX = targetX,
     held = false,
     result = false;
-  if (t < 1) x = mix(156, 240, ease(t));
-  else if (t < 2) y = mix(188, 338, ease(t - 1));
-  else if (t < 2.4) {
-    y = 338;
-    open = 1 - ease((t - 2) / 0.4);
-  } else if (t < 3.3) {
-    y = mix(338, 210, ease((t - 2.4) / 0.9));
+  if (t < 0.8) x = mix(156, targetX, ease(t / 0.8));
+  else if (t < 1.8) y = mix(188, 308, ease((t - 0.8) / 1));
+  else if (t < 2.2) {
+    y = 308;
+    open = 1 - ease((t - 1.8) / 0.4);
+  } else if (failed && t < 3.15) {
+    y = mix(308, 188, ease((t - 2.2) / 0.95));
+    open = 0;
+  } else if (failed) {
+    x = mix(targetX, 156, ease((t - 3.15) / 1.15));
+    y = 188;
+    open = ease((t - 3.15) / 0.3);
+    result = t >= 4.3;
+  } else if (t < 3.1) {
+    y = mix(308, 210, ease((t - 2.2) / 0.9));
     open = 0;
     held = true;
-  } else if (t < 4) {
-    x = mix(240, 325, ease((t - 3.3) / 0.7));
+  } else if (t < 3.8) {
+    x = mix(targetX, 325, ease((t - 3.1) / 0.7));
     y = 210;
     open = 0;
     held = true;
-  } else if (t < 4.6) {
+  } else if (t < 4.35) {
     x = 325;
     y = 210;
-    open = ease((t - 4) / 0.2);
+    open = ease((t - 3.8) / 0.22);
     prizeX = 325;
-    prizeY = mix(274, 575, ((t - 4) / 0.6) ** 2);
+    prizeY = mix(274, 474, ((t - 3.8) / 0.55) ** 2);
   } else {
-    x = mix(325, 156, ease((t - 4.6) / 1.4));
+    x = mix(325, 156, ease((t - 4.35) / 1.2));
     y = 188;
     result = true;
-    prizeX = 240;
-    prizeY = 530 - Math.sin(Math.min(1, (t - 4.6) / 0.4) * Math.PI) * 20;
   }
   if (held) {
     prizeX = x;
@@ -105,8 +112,11 @@ export function renderScene(
   scene: Scene,
   time: number,
 ) {
-  const theme = THEMES[scene.theme] || THEMES[0],
-    p = pose(time);
+  const theme = THEMES[scene.theme] || THEMES[0];
+  const failed = scene.outcome === "fail";
+  const targetIndex = scene.outcome === 1 && scene.photos[1] ? 1 : 0;
+  const targetX = failed ? 240 : targetIndex === 0 ? 210 : 274;
+  const p = pose(time, targetX, failed);
   const w = ctx.canvas.width;
   ctx.save();
   ctx.scale(w / 480, w / 480);
@@ -234,13 +244,71 @@ export function renderScene(
     line(-3, 7, 3, 7, "#a78388", 1.5);
     ctx.restore();
   };
+  const drawPhoto = (
+    photo: Photo,
+    x: number,
+    y: number,
+    maxW: number,
+    maxH: number,
+    rotation = 0,
+    scale = 1,
+  ) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation + (photo.rotation * Math.PI) / 180);
+    ctx.scale(photo.flip ? -1 : 1, 1);
+    const ratio =
+      Math.min(maxW / photo.image.width, maxH / photo.image.height) *
+      photo.scale *
+      scale;
+    const iw = photo.image.width * ratio,
+      ih = photo.image.height * ratio;
+    ctx.shadowColor = "#fffdf7";
+    ctx.shadowBlur = 0;
+    for (const [ox, oy] of [
+      [-3, 0],
+      [3, 0],
+      [0, -3],
+      [0, 3],
+    ]) {
+      ctx.shadowOffsetX = ox;
+      ctx.shadowOffsetY = oy;
+      ctx.drawImage(photo.image, -iw / 2, -ih / 2, iw, ih);
+    }
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 3;
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = "#75646a44";
+    ctx.drawImage(photo.image, -iw / 2, -ih / 2, iw, ih);
+    ctx.restore();
+  };
+
+  // The uploaded cutouts repeat through the pile like stocked character dolls.
+  plush(104, 395, 24, "#e6bfcf");
+  plush(363, 397, 26, "#fff4cc", 1);
+  const pileLayouts = [
+    [
+      [132, 418, 61, 76, -0.14],
+      [218, 432, 70, 84, 0.08],
+      [340, 414, 59, 73, -0.11],
+    ],
+    [
+      [158, 405, 59, 72, 0.13],
+      [278, 430, 69, 83, -0.08],
+      [365, 430, 57, 69, 0.15],
+    ],
+  ] as const;
+  scene.photos.forEach((photo, photoIndex) =>
+    pileLayouts[photoIndex].forEach(([x, y, maxW, maxH, rotation]) =>
+      drawPhoto(photo, x, y, maxW, maxH, rotation),
+    ),
+  );
   [
-    [108, 415, 25, "#e6bfcf"],
-    [365, 420, 29, "#fff4cc"],
-    [145, 432, 26, "#fff4cc"],
-    [329, 435, 25, "#d2c4e6"],
-    [195, 445, 25, "#c1d8c3"],
-    [277, 442, 24, "#efb8bc"],
+    [106, 440, 24, "#efb8bc"],
+    [170, 447, 25, "#fff4cc"],
+    [252, 449, 24, "#c1d8c3"],
+    [320, 446, 25, "#d2c4e6"],
+    [374, 449, 22, "#efb8bc"],
   ].forEach((a, i) =>
     plush(
       a[0] as number,
@@ -250,48 +318,12 @@ export function renderScene(
       i % 2,
     ),
   );
-  const prize = (x: number, y: number, result = false) => {
-    const count = scene.photos.length || 1;
-    for (let i = 0; i < count; i++) {
-      ctx.save();
-      ctx.translate(x + (count === 2 ? (i - 0.5) * 78 : 0), y);
-      ctx.rotate(
-        (p.held ? Math.sin(time / 170) * 0.045 : 0) +
-          (count === 2 ? (i - 0.5) * 0.12 : 0),
-      );
-      const photo = scene.photos[i];
-      if (photo) {
-        ctx.rotate((photo.rotation * Math.PI) / 180);
-        ctx.scale(photo.flip ? -1 : 1, 1);
-        const maxH = result ? 89 : 116,
-          maxW = count === 2 ? 92 : 125;
-        const ratio =
-          Math.min(maxW / photo.image.width, maxH / photo.image.height) *
-          photo.scale;
-        const iw = photo.image.width * ratio,
-          ih = photo.image.height * ratio;
-        ctx.shadowColor = "#ffffff";
-        ctx.shadowBlur = 0;
-        for (const [ox, oy] of [
-          [-3, 0],
-          [3, 0],
-          [0, -3],
-          [0, 3],
-        ]) {
-          ctx.shadowOffsetX = ox;
-          ctx.shadowOffsetY = oy;
-          ctx.drawImage(photo.image, -iw / 2, -ih / 2, iw, ih);
-        }
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 3;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = "#75646a44";
-        ctx.drawImage(photo.image, -iw / 2, -ih / 2, iw, ih);
-      } else plush(0, 10, result ? 32 : 42, "#fff9ec");
-      ctx.restore();
-    }
-  };
-  if (!p.result) prize(p.prizeX, p.prizeY);
+
+  const targetPhoto = scene.photos[targetIndex];
+  if (!failed && targetPhoto && !p.result) {
+    const swing = p.held ? Math.sin(time / 170) * 0.045 : 0;
+    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 104, 112, swing);
+  }
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
   const spread = 12 + p.open * 17;
@@ -314,63 +346,69 @@ export function renderScene(
   line(95, 226, 169, 183, "#fff", 3);
   line(345, 437, 383, 414, "#fff", 7);
   ctx.restore();
-  box(75, 466, 322, 32, 12, "#fff2e3");
-  text(
-    p.result ? "WINNER! ♡" : "ONE PLAY · ONE LITTLE HAPPINESS",
-    208,
-    487,
-    10,
-    theme.dark,
-    232,
-  );
+  // A proper arcade control deck: joystick, coin slot and two action buttons.
+  box(75, 466, 322, 43, 12, "#fff2e3", theme.dark);
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
-  ctx.arc(370, 482, 9, 0, 7);
+  ctx.ellipse(122, 493, 27, 8, 0, 0, 7);
   ctx.fill();
-  ctx.fillStyle = "#fff0d8";
+  line(122, 489, 111, 472, "#6f6268", 5);
+  ctx.fillStyle = "#fff9ea";
   ctx.beginPath();
-  ctx.arc(368, 479, 4, 0, 7);
+  ctx.arc(109, 469, 9, 0, 7);
   ctx.fill();
-  box(141, 506, 196, 62, 15, theme.dark);
-  box(153, 514, 172, 46, 8, "#443d4e");
-  if (p.result) {
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  box(179, 477, 55, 24, 5, theme.light, theme.dark);
+  box(194, 483, 25, 4, 2, theme.dark);
+  ctx.fillStyle = theme.dark;
+  ctx.beginPath();
+  ctx.arc(309, 486, 11, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = "#e8bd65";
+  ctx.beginPath();
+  ctx.arc(349, 486, 11, 0, 7);
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(349, 486, 11, 0, 7);
+  ctx.stroke();
+
+  box(141, 520, 196, 49, 14, theme.dark);
+  box(153, 527, 172, 34, 7, "#443d4e");
+  if (p.result && !failed && targetPhoto) {
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(90, 460, 300, 111, 10);
+    ctx.roundRect(153, 527, 172, 34, 7);
     ctx.clip();
-    prize(p.prizeX, p.prizeY, true);
+    drawPhoto(targetPhoto, 239, 551, 55, 49, -0.04);
     ctx.restore();
-    box(130, 449, 220, 32, 12, "#fff9e9", theme.dark);
+    ctx.fillStyle = "#332d3b55";
+    ctx.fillRect(153, 556, 172, 5);
+  }
+  text("PRIZE OUT", 239, 579, 7, "#fff8ed", 90);
+  if (p.result) {
+    box(135, 397, 210, 34, 12, "#fff9e9", theme.dark);
     text(
-      scene.message.trim() ||
-        (scene.photos.length === 2 ? "DOUBLE GET!" : "GET!"),
+      scene.message.trim() || (failed ? "TRY AGAIN!" : "GET!"),
       240,
-      471,
+      420,
       19,
       theme.dark,
-      202,
+      190,
     );
-    for (let i = 0; i < 14; i++) {
-      const q = (time - 4600) / 1400;
+    for (let i = 0; i < (failed ? 6 : 14); i++) {
+      const q = Math.max(0, (time - 4300) / 1700);
       star(
-        90 + i * 23,
-        452 - ((i * 31) % 65) + q * 20,
-        3 + (i % 3),
-        i % 2 ? theme.dark : "#e3b655",
+        96 + i * (failed ? 57 : 22),
+        390 - ((i * 31) % 70) + q * 18,
+        (failed ? 2 : 3) + (i % 3),
+        failed ? "#b6a9ae" : i % 2 ? theme.dark : "#e3b655",
       );
     }
   }
-  text(
-    scene.photos
-      .map((x) => x.name.trim())
-      .filter(Boolean)
-      .join(" & ") || "MADE WITH LOVE",
-    236,
-    578,
-    9,
-    "#fffaf3",
-    285,
-  );
   text("CATCHU!  /  POCKET ARCADE", 240, 625, 9, theme.dark);
   ctx.restore();
 }
