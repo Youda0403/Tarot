@@ -435,7 +435,7 @@ export default function Home() {
                 <input
                   maxLength={12}
                   value={message}
-                  placeholder={outcome === "fail" ? "Fail" : "GET!"}
+                  placeholder={outcome === "fail" ? "FAIL!" : "GET!"}
                   onChange={(e) => {
                     clearDownload();
                     setMessage(e.target.value);
