@@ -235,7 +235,7 @@ export default function Home() {
           </div>
           <p className="sample-note">
             {photos.length === 0
-              ? "지금은 샘플 인형이 들어 있어요. 아래에서 최애 사진을 넣어 주세요!"
+              ? "아래에서 최애 사진을 넣어 주세요!"
               : "사진은 이 기기에서만 처리되고 서버로 전송되지 않아요."}
           </p>
         </section>
@@ -391,6 +391,17 @@ export default function Home() {
                       <span>{photos.length === 1 ? "이 인형" : `사진 ${i + 1}`}</span>
                     </button>
                   ))}
+                  {photos.length === 2 && (
+                    <button className={"result-card " + (outcome === "lucky" ? "selected" : "")}
+                      aria-pressed={outcome === "lucky"}
+                      aria-label="서로 다른 인형 두 개 뽑기"
+                      onClick={() => { clearDownload(); setOutcome("lucky"); }}>
+                      <span className="result-thumb" style={{display:"flex", alignItems:"center", justifyContent:"center", gap:2}}>
+                        {photos.map((photo, index) => <img key={index} src={photo.thumbnail} alt="" style={{width:"45%", objectFit:"contain"}} />)}
+                      </span>
+                      <span>1+1 Lucky!</span>
+                    </button>
+                  )}
                   <button
                     className={
                       "result-card fail-card " +
@@ -425,7 +436,7 @@ export default function Home() {
                   <div className="pile-count-ticks" aria-hidden="true">
                     <span>4개</span><span>6개</span><span>8개</span><span>10개</span><span>12개</span>
                   </div>
-                  <p className="hint">두 사진의 전체 개수를 같게 맞추고 앞뒤로 고르게 섞어요. 기본 인형은 뒤쪽에 있어요.</p>
+                  <p className="hint">두 사진의 전체 개수를 같게 맞추고 앞뒤로 고르게 섞어요. 사진 인형만 배치돼요.</p>
                 </div>
               </section>
             )}
@@ -477,7 +488,7 @@ export default function Home() {
                 <input
                   maxLength={12}
                   value={message}
-                  placeholder={outcome === "fail" ? "FAIL!" : "GET!"}
+                  placeholder={outcome === "fail" ? "FAIL!" : outcome === "lucky" ? "Lucky!" : "GET!"}
                   onChange={(e) => {
                     clearDownload();
                     setMessage(e.target.value);

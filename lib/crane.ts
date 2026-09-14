@@ -44,7 +44,7 @@ export type Photo = {
   rotation: number;
   flip: boolean;
 };
-export type Outcome = 0 | 1 | "fail";
+export type Outcome = 0 | 1 | "fail" | "lucky";
 export type Scene = {
   photos: Photo[];
   theme: number;
@@ -163,7 +163,14 @@ export function renderScene(
   const candidates = pile.filter(item => item.photoIndex === targetIndex && item.x < 240);
   const selection = (Math.imul((scene.pickSeed ?? 0) + 1, 2654435761) >>> 0) / 4294967296;
   const target = candidates[Math.floor(selection * candidates.length)] || pile[0];
+  const lucky = scene.outcome === "lucky" && scene.photos.length === 2;
+  const partner = lucky ? pile.filter(item => item.photoIndex !== targetIndex)
+    .sort((a, b) => Math.hypot(a.x - target.x, a.y - target.y) - Math.hypot(b.x - target.x, b.y - target.y))[0] : undefined;
   const p = pose(time, target.x, failed, target.y);
+  const pairProgress = ease((time - 2200) / 600);
+  const pairOffset = lucky ? pairProgress * 23 : 0;
+  const partnerX = partner ? mix(partner.x, p.prizeX + 23, pairProgress) : 0;
+  const partnerY = partner ? mix(partner.y, p.prizeY + 15, pairProgress) : 0;
   const w = ctx.canvas.width;
   ctx.save();
   ctx.scale(w / 480, w / 480);
@@ -269,31 +276,6 @@ export function renderScene(
     line(90 + i * 60, 172, 90 + i * 60, 446, "#ffffff66", 1);
   box(91, 177, 290, 9, 4, "#d0c7c3");
   line(104, 181, 365, 181, "#fdfaf3", 3);
-  const plush = (
-    x: number,
-    y: number,
-    size: number,
-    color: string,
-    kind = 0,
-  ) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(Math.sin(x) * 0.18);
-    if (kind) {
-      star(0, 0, size, color);
-    } else {
-      box(-size * 0.7, -size, size * 1.4, size * 1.6, size * 0.55, color);
-      box(-size * 0.65, -size * 1.35, size * 0.45, size * 0.65, 8, color);
-      box(size * 0.2, -size * 1.35, size * 0.45, size * 0.65, 8, color);
-    }
-    ctx.fillStyle = "#735f65";
-    ctx.beginPath();
-    ctx.arc(-size * 0.22, -2, 2, 0, 7);
-    ctx.arc(size * 0.22, -2, 2, 0, 7);
-    ctx.fill();
-    line(-3, 7, 3, 7, "#a78388", 1.5);
-    ctx.restore();
-  };
   const drawPhoto = (
     photo: Photo,
     x: number,
@@ -333,24 +315,6 @@ export function renderScene(
     ctx.restore();
   };
 
-  // Original bunny and star plushies fill gaps, always behind photo dolls.
-  [
-    [104, 407, 27, "#e6bfcf", 0],
-    [146, 392, 26, "#fff4cc", 1],
-    [192, 414, 28, "#c1d8c3", 0],
-    [239, 391, 27, "#d2c4e6", 1],
-    [287, 412, 27, "#efb8bc", 0],
-    [334, 393, 26, "#fff4cc", 1],
-    [377, 409, 27, "#c1d8c3", 0],
-  ].forEach(a =>
-    plush(
-      a[0] as number,
-      a[1] as number,
-      a[2] as number,
-      a[3] as string,
-      a[4] as number,
-    ),
-  );
   const drawClaw = () => {
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
@@ -378,15 +342,23 @@ export function renderScene(
       const rotation = time < 2200 ? target.rotation
         : target.rotation * (1 - straightening) +
           (p.held ? Math.sin(time / 170) * 0.045 : wobble) * straightening;
-      drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, rotation);
+      if (lucky && partner) {
+        if (p.held) {
+          line(p.x, p.y + 42, p.prizeX - pairOffset, p.prizeY - 26, "#b6abb0", 2);
+          line(p.x, p.y + 42, partnerX, partnerY - 26, "#b6abb0", 2);
+        }
+        drawPhoto(scene.photos[partner.photoIndex], partnerX, partnerY, 61, 76,
+          partner.rotation * (1 - pairProgress) + Math.sin(time / 190) * 0.1 * pairProgress);
+      }
+      drawPhoto(targetPhoto, p.prizeX - pairOffset, p.prizeY, 61, 76, rotation);
     }
     // Always draw fingers in front of the held doll, as one depth group.
     drawClaw();
   };
   let rigDrawn = false;
   pile.slice().sort((a, b) => a.y - b.y).forEach(item => {
-    if (!rigDrawn && item.y >= target.y) { drawRig(); rigDrawn = true; }
-    if (item.id === target.id) return;
+    if (time < 3100 && !rigDrawn && item.y >= target.y) { drawRig(); rigDrawn = true; }
+    if (item.id === target.id || item.id === partner?.id) return;
     const photo = scene.photos[item.photoIndex];
     if (photo) drawPhoto(photo, item.x, item.y, item.maxW, item.maxH, item.rotation);
   });
@@ -452,7 +424,9 @@ export function renderScene(
     ctx.beginPath();
     ctx.roundRect(250, 526, 127, 47, 6);
     ctx.clip();
-    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, -0.04 * ease((time - 4400) / 400));
+    if (lucky && partner)
+      drawPhoto(scene.photos[partner.photoIndex], partnerX, partnerY, 61, 76, 0.06);
+    drawPhoto(targetPhoto, p.prizeX - pairOffset, p.prizeY, 61, 76, -0.04 * ease((time - 4400) / 400));
     ctx.restore();
     ctx.fillStyle = "#332d3b55";
     ctx.fillRect(250, 567, 127, 6);
@@ -523,7 +497,7 @@ export function renderScene(
     ctx.lineJoin = "round";
     ctx.lineWidth = 6;
     ctx.strokeStyle = "#fff9e9";
-    const message = customMessage || (failed ? "FAIL!" : "GET!");
+    const message = customMessage || (failed ? "FAIL!" : lucky ? "Lucky!" : "GET!");
     ctx.textAlign = "center";
     ctx.fillStyle = failed ? "#506991" : theme.dark;
     ctx.fillText(message, 0, 0, bubbleW - 24);
