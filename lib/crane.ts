@@ -50,7 +50,7 @@ export type Scene = {
   message: string;
   outcome: Outcome;
 };
-export const DURATION = 6000;
+export const DURATION = 8000;
 const mix = (a: number, b: number, t: number) =>
   a + (b - a) * Math.max(0, Math.min(1, t));
 const ease = (t: number) => {
@@ -63,25 +63,28 @@ export function pose(time: number, targetX = 240, failed = false) {
   let x = targetX,
     y = 188,
     open = 1,
-    prizeY = 365,
+    prizeY = 383,
     prizeX = targetX,
     held = false,
     result = false;
   if (t < 0.8) x = mix(156, targetX, ease(t / 0.8));
-  else if (t < 1.8) y = mix(188, 308, ease((t - 0.8) / 1));
+  else if (t < 1.8) y = mix(188, 335, ease((t - 0.8) / 1));
   else if (t < 2.2) {
-    y = 308;
+    y = 335;
     open = 1 - ease((t - 1.8) / 0.4);
-  } else if (failed && t < 3.15) {
-    y = mix(308, 188, ease((t - 2.2) / 0.95));
+  } else if (failed && t < 2.95) {
+    y = mix(335, 248, ease((t - 2.2) / 0.75));
     open = 0;
+    held = true;
   } else if (failed) {
-    x = mix(targetX, 156, ease((t - 3.15) / 1.15));
-    y = 188;
-    open = ease((t - 3.15) / 0.3);
-    result = t >= 4.3;
+    x = mix(targetX, 156, ease((t - 3.5) / 1.1));
+    y = mix(248, 188, ease((t - 2.95) / 0.8));
+    open = ease((t - 2.95) / 0.22);
+    const fall = Math.max(0, (t - 2.95) / 0.55);
+    prizeY = fall < 1 ? mix(296, 383, fall * fall) : 383 - Math.sin(Math.min(1, (fall - 1) * 2) * Math.PI) * 7;
+    result = t >= 3.5;
   } else if (t < 3.1) {
-    y = mix(308, 210, ease((t - 2.2) / 0.9));
+    y = mix(335, 210, ease((t - 2.2) / 0.9));
     open = 0;
     held = true;
   } else if (t < 3.8) {
@@ -89,20 +92,19 @@ export function pose(time: number, targetX = 240, failed = false) {
     y = 210;
     open = 0;
     held = true;
-  } else if (t < 4.35) {
-    x = 325;
-    y = 210;
-    open = ease((t - 3.8) / 0.22);
-    prizeX = 325;
-    prizeY = mix(274, 474, ((t - 3.8) / 0.55) ** 2);
   } else {
-    x = mix(325, 156, ease((t - 4.35) / 1.2));
-    y = 188;
-    result = true;
+    x = mix(325, 156, ease((t - 4.6) / 1.2));
+    y = mix(210, 188, ease((t - 4.6) / 0.6));
+    open = ease((t - 3.8) / 0.22);
+    const fall = Math.max(0, (t - 3.8) / 0.8);
+    prizeX = 325;
+    prizeY = mix(258, 545, fall * fall);
+    if (fall >= 1) prizeY -= Math.sin(Math.min(1, (t - 4.6) / 0.4) * Math.PI) * 6;
+    result = t >= 4.6;
   }
   if (held) {
     prizeX = x;
-    prizeY = y + 64;
+    prizeY = y + 48;
   }
   return { x, y, open, prizeX, prizeY, held, result };
 }
@@ -115,7 +117,7 @@ export function renderScene(
   const theme = THEMES[scene.theme] || THEMES[0];
   const failed = scene.outcome === "fail";
   const targetIndex = scene.outcome === 1 && scene.photos[1] ? 1 : 0;
-  const targetX = failed ? 240 : targetIndex === 0 ? 210 : 274;
+  const targetX = targetIndex === 0 ? 210 : 274;
   const p = pose(time, targetX, failed);
   const w = ctx.canvas.width;
   ctx.save();
@@ -320,10 +322,13 @@ export function renderScene(
   );
 
   const targetPhoto = scene.photos[targetIndex];
-  if (!failed && targetPhoto && !p.result) {
+  if (targetPhoto) {
     const swing = p.held ? Math.sin(time / 170) * 0.045 : 0;
-    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 104, 112, swing);
+    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, swing);
   }
+  // Visible mouth of the chute, aligned with the retrieval bay below.
+  box(291, 417, 69, 30, 5, "#443d4e", theme.dark);
+  line(294, 418, 357, 418, "#fff9ea", 3);
   line(p.x, 185, p.x, p.y, "#958d91", 4);
   box(p.x - 16, p.y - 7, 32, 19, 7, "#fff8e9", "#97868b");
   const spread = 12 + p.open * 17;
@@ -346,65 +351,83 @@ export function renderScene(
   line(95, 226, 169, 183, "#fff", 3);
   line(345, 437, 383, 414, "#fff", 7);
   ctx.restore();
-  // A proper arcade control deck: joystick, coin slot and two action buttons.
-  box(75, 466, 322, 43, 12, "#fff2e3", theme.dark);
+  // Integrated sloped deck: joystick at left, one large DROP button at right.
+  box(65, 459, 342, 47, 10, theme.dark);
+  box(65, 453, 342, 40, 10, "#fff2e3", theme.dark);
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
-  ctx.ellipse(122, 493, 27, 8, 0, 0, 7);
+  ctx.ellipse(122, 480, 27, 8, 0, 0, 7);
   ctx.fill();
-  line(122, 489, 111, 472, "#6f6268", 5);
+  line(122, 479, 119, 460, "#6f6268", 6);
   ctx.fillStyle = "#fff9ea";
   ctx.beginPath();
-  ctx.arc(109, 469, 9, 0, 7);
+  ctx.arc(118, 456, 11, 0, 7);
   ctx.fill();
   ctx.strokeStyle = theme.dark;
   ctx.lineWidth = 2;
   ctx.stroke();
-  box(179, 477, 55, 24, 5, theme.light, theme.dark);
-  box(194, 483, 25, 4, 2, theme.dark);
+  box(191, 463, 62, 22, 4, "#443d4e");
+  text("01 PLAY", 222, 478, 10, "#fff4cc");
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
-  ctx.arc(309, 486, 11, 0, 7);
+  ctx.ellipse(340, 478, 23, 12, 0, 0, 7);
   ctx.fill();
   ctx.fillStyle = "#e8bd65";
   ctx.beginPath();
-  ctx.arc(349, 486, 11, 0, 7);
+  ctx.ellipse(340, 471, 22, 12, 0, 0, 7);
   ctx.fill();
   ctx.strokeStyle = theme.dark;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(349, 486, 11, 0, 7);
+  ctx.ellipse(340, 471, 22, 12, 0, 0, 7);
   ctx.stroke();
+  text("DROP", 340, 475, 9, theme.dark);
+  box(102, 519, 58, 43, 6, theme.light, theme.dark);
+  box(127, 525, 6, 22, 2, theme.dark);
+  text("COIN", 131, 558, 8, theme.dark);
 
-  box(141, 520, 196, 49, 14, theme.dark);
-  box(153, 527, 172, 34, 7, "#443d4e");
-  if (p.result && !failed && targetPhoto) {
+  text("P R I Z E  O U T", 312, 516, 10, "#fff8ed", 150);
+  box(241, 522, 145, 56, 10, theme.dark);
+  box(250, 526, 127, 47, 6, "#443d4e");
+  if (!failed && targetPhoto && time >= 3800) {
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(153, 527, 172, 34, 7);
+    ctx.roundRect(250, 526, 127, 47, 6);
     ctx.clip();
-    drawPhoto(targetPhoto, 239, 551, 55, 49, -0.04);
+    drawPhoto(targetPhoto, p.prizeX, p.prizeY, 61, 76, -0.04 * ease((time - 4400) / 400));
     ctx.restore();
     ctx.fillStyle = "#332d3b55";
-    ctx.fillRect(153, 556, 172, 5);
+    ctx.fillRect(250, 567, 127, 6);
   }
-  text("PRIZE OUT", 239, 579, 7, "#fff8ed", 90);
   if (p.result) {
-    box(135, 397, 210, 34, 12, "#fff9e9", theme.dark);
+    const elapsed = (time - (failed ? 3500 : 4600)) / 1000;
+    const pop = Math.min(1, elapsed / 0.45);
+    const size = 1 + Math.sin(pop * Math.PI) * 0.24;
+    ctx.save();
+    ctx.translate(240, 289 - ease(pop) * 12);
+    ctx.scale(size, size);
+    ctx.font = "900 38px sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "#fff9e9";
+    ctx.strokeText(scene.message.trim() || (failed ? "OOPS!" : "GET!"), 0, 0, 260);
     text(
-      scene.message.trim() || (failed ? "TRY AGAIN!" : "GET!"),
-      240,
-      420,
-      19,
+      scene.message.trim() || (failed ? "OOPS!" : "GET!"),
+      0,
+      0,
+      38,
       theme.dark,
-      190,
+      260,
     );
+    ctx.restore();
     for (let i = 0; i < (failed ? 6 : 14); i++) {
-      const q = Math.max(0, (time - 4300) / 1700);
+      const q = ease(Math.min(1, elapsed / 0.55));
+      const angle = (i / (failed ? 6 : 14)) * Math.PI * 2;
       star(
-        96 + i * (failed ? 57 : 22),
-        390 - ((i * 31) % 70) + q * 18,
-        (failed ? 2 : 3) + (i % 3),
+        240 + Math.cos(angle) * (60 + q * 68),
+        270 + Math.sin(angle) * (25 + q * 35),
+        ((failed ? 2 : 3) + (i % 3)) * (0.7 + 0.3 * Math.sin(elapsed * 5 + i)),
         failed ? "#b6a9ae" : i % 2 ? theme.dark : "#e3b655",
       );
     }

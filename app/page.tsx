@@ -209,7 +209,7 @@ export default function Home() {
             >
               {playing ? "Ⅱ 정지" : "▷ 뽑아보기"}
             </button>
-            <span>6초의 작은 행복 · 반복 재생</span>
+            <span>8초의 작은 행복 · 반복 재생</span>
           </div>
           <p className="sample-note">
             {photos.length === 0
