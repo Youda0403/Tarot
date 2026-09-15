@@ -454,7 +454,7 @@ export function renderScene(
       ctx.restore();
     }
     const customMessage = scene.message.trim();
-    if (!failed) {
+    if (!failed && !lucky) {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(81, 170, 310, 277, 9);
@@ -481,18 +481,24 @@ export function renderScene(
       ctx.beginPath();
       ctx.roundRect(81, 170, 310, 277, 9);
       ctx.clip();
-      for (let i = 0; i < 36; i++) {
-        const age = elapsed - i * 0.018;
+      for (let i = 0; i < 32; i++) {
+        // Four launch points and a fast upward kick make the burst read like
+        // scattered confetti instead of a round firework.
+        const age = elapsed - (i % 5) * 0.009;
         if (age < 0) continue;
-        const life = Math.min(1, age / 2.05);
-        const angle = -Math.PI + (i * 2.399963) % Math.PI;
-        const speed = 65 + (i * 37) % 105;
-        const x = 236 + ((i * 47) % 91 - 45) + Math.cos(angle) * speed * age;
-        const y = 253 + (i * 13) % 25 + Math.sin(angle) * speed * age + 88 * age * age;
+        const life = Math.min(1, age / 1.8);
+        const lane = i % 4;
+        const originX = 126 + lane * 73 + ((i * 29) % 25 - 12);
+        const originY = 286 + ((i * 17) % 23 - 11);
+        const outward = lane < 2 ? -34 : 34;
+        const velocityX = ((i * 73) % 221 - 110) * 1.35 + outward;
+        const velocityY = -176 - (i * 43) % 112;
+        const x = originX + velocityX * age + Math.sin(i * 1.7 + age * 8) * age * 7;
+        const y = originY + velocityY * age + 178 * age * age;
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(i + age * (i % 2 ? 5 : -5));
-        ctx.globalAlpha = (1 - ease(Math.max(0, (life - 0.7) / 0.3))) * (1 - exit);
+        ctx.rotate(i * 0.7 + age * (i % 2 ? 7 : -7));
+        ctx.globalAlpha = (1 - ease(Math.max(0, (life - 0.72) / 0.28))) * (1 - exit);
         ctx.fillStyle = ["#ef9dad", "#efc56c", "#98c9dc", "#b9cf98", "#baacd9", "#fff9e2"][i % 6];
         ctx.scale(0.45 + Math.abs(Math.cos(age * 7 + i)) * 0.55, 1);
         ctx.fillRect(-3, -5, 6, 10);
