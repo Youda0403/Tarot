@@ -482,19 +482,20 @@ export function renderScene(
       ctx.roundRect(81, 170, 310, 277, 9);
       ctx.clip();
       for (let i = 0; i < 32; i++) {
-        // Four launch points and a fast upward kick make the burst read like
-        // scattered confetti instead of a round firework.
-        const age = elapsed - (i % 5) * 0.009;
-        if (age < 0) continue;
+        // One simultaneous pop. Independent velocities fill the spray rather
+        // than placing pieces on a circular rim; drag slows the initial kick.
+        const age = elapsed;
         const life = Math.min(1, age / 1.8);
-        const lane = i % 4;
-        const originX = 126 + lane * 73 + ((i * 29) % 25 - 12);
-        const originY = 286 + ((i * 17) % 23 - 11);
-        const outward = lane < 2 ? -34 : 34;
-        const velocityX = ((i * 73) % 221 - 110) * 1.35 + outward;
-        const velocityY = -176 - (i * 43) % 112;
-        const x = originX + velocityX * age + Math.sin(i * 1.7 + age * 8) * age * 7;
-        const y = originY + velocityY * age + 178 * age * age;
+        const random = (salt: number) => {
+          const value = Math.sin((i + 1) * 127.1 + salt * 311.7) * 43758.5453;
+          return value - Math.floor(value);
+        };
+        const velocityX = (random(1) - 0.5) * 1400;
+        const velocityY = -160 - random(2) * 510;
+        const travel = (1 - Math.exp(-5 * age)) / 5;
+        const flutter = (1 - Math.exp(-3 * age)) * age;
+        const x = 236 + velocityX * travel + Math.sin(i * 1.7 + age * 8) * flutter * 9;
+        const y = 300 + velocityY * travel + 112 * age * age;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(i * 0.7 + age * (i % 2 ? 7 : -7));
