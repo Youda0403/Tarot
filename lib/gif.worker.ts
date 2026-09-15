@@ -3,7 +3,7 @@ let encoder: ReturnType<typeof GIFEncoder> | null = null;
 let palette: number[][] | null = null;
 self.onmessage = (event: MessageEvent) => {
   try {
-    const { type, data, width, height } = event.data;
+    const { type, data, width, height, delay } = event.data;
     if (type === "start") {
       encoder = GIFEncoder();
       palette = quantize(new Uint8Array(data), 256);
@@ -15,7 +15,7 @@ self.onmessage = (event: MessageEvent) => {
       const index = applyPalette(rgba, palette);
       encoder.writeFrame(index, width, height, {
         palette,
-        delay: 100,
+        delay: delay ?? 40,
         repeat: 0,
       });
       self.postMessage({ type: "frame" });

@@ -481,14 +481,14 @@ export function renderScene(
       ctx.beginPath();
       ctx.roundRect(81, 170, 310, 277, 9);
       ctx.clip();
-      for (let i = 0; i < 56; i++) {
-        const age = elapsed - (i % 7) * 0.055;
+      for (let i = 0; i < 36; i++) {
+        const age = elapsed - i * 0.018;
         if (age < 0) continue;
         const life = Math.min(1, age / 2.05);
         const angle = -Math.PI + (i * 2.399963) % Math.PI;
         const speed = 65 + (i * 37) % 105;
-        const x = 236 + Math.cos(angle) * speed * age;
-        const y = 265 + Math.sin(angle) * speed * age + 88 * age * age;
+        const x = 236 + ((i * 47) % 91 - 45) + Math.cos(angle) * speed * age;
+        const y = 253 + (i * 13) % 25 + Math.sin(angle) * speed * age + 88 * age * age;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(i + age * (i % 2 ? 5 : -5));

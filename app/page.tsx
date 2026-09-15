@@ -128,7 +128,8 @@ export default function Home() {
       const w = new Worker(new URL("../lib/gif.worker.ts", import.meta.url));
       worker.current = w;
       let index = 0;
-      const count = DURATION / 100;
+      const frameDelay = 40;
+      const count = Math.ceil(DURATION / frameDelay);
       const fail = () => {
         cancel();
         setError("GIF 생성에 실패했어요. 일반 화질로 다시 시도해 주세요.");
@@ -138,11 +139,12 @@ export default function Home() {
           w.postMessage({ type: "finish" });
           return;
         }
-        renderScene(ctx, frozen, index * 100);
+        renderScene(ctx, frozen, index * frameDelay);
         const frame = ctx.getImageData(0, 0, out.width, out.height);
         w.postMessage(
           {
             type: "frame",
+            delay: frameDelay,
             data: frame.data.buffer,
             width: out.width,
             height: out.height,
