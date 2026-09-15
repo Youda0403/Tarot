@@ -449,12 +449,7 @@ export function renderScene(
       const gloom = ctx.createLinearGradient(0, 0, 0, 640);
       gloom.addColorStop(0, "#344f89");
       gloom.addColorStop(1, "#a4bfdf");
-      // The gloom tints every pixel of the frame, so fading it continuously
-      // asks the 256-colour GIF palette for a fresh full-screen tint on every
-      // frame; the encoder cannot hold them all and swaps whole bands between
-      // neighbouring entries, which is the colour flicker. Holding the fade on
-      // a few steps keeps the tints to a handful the palette represents exactly.
-      ctx.globalAlpha = (Math.round(ease(pop) * 3) / 3) * 0.28;
+      ctx.globalAlpha = ease(pop) * 0.28;
       ctx.fillStyle = gloom;
       ctx.fillRect(0, 0, 480, 640);
       ctx.globalAlpha = ease(pop) * 0.3;
