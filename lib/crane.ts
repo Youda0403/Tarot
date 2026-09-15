@@ -475,6 +475,31 @@ export function renderScene(
       }
       ctx.restore();
     }
+    if (lucky) {
+      // Deterministic confetti: preview and GIF use identical particle paths.
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(81, 170, 310, 277, 9);
+      ctx.clip();
+      for (let i = 0; i < 56; i++) {
+        const age = elapsed - (i % 7) * 0.055;
+        if (age < 0) continue;
+        const life = Math.min(1, age / 2.05);
+        const angle = -Math.PI + (i * 2.399963) % Math.PI;
+        const speed = 65 + (i * 37) % 105;
+        const x = 236 + Math.cos(angle) * speed * age;
+        const y = 265 + Math.sin(angle) * speed * age + 88 * age * age;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(i + age * (i % 2 ? 5 : -5));
+        ctx.globalAlpha = (1 - ease(Math.max(0, (life - 0.7) / 0.3))) * (1 - exit);
+        ctx.fillStyle = ["#ef9dad", "#efc56c", "#98c9dc", "#b9cf98", "#baacd9", "#fff9e2"][i % 6];
+        ctx.scale(0.45 + Math.abs(Math.cos(age * 7 + i)) * 0.55, 1);
+        ctx.fillRect(-3, -5, 6, 10);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
     const resultX = 366;
     const resultY = 218;
     ctx.save();
