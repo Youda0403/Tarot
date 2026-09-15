@@ -173,12 +173,17 @@ export default function Home() {
         }
       };
       // Sample the entire animation, including the blue failure overlay,
-      // so every exported frame uses the same color mapping.
+      // so every exported frame uses the same color mapping. The overlay fades
+      // in across 4550-5000ms and tints every pixel of the frame as it goes, so
+      // that stretch needs its own samples: without them the palette holds only
+      // the start and end tints and the encoder swaps whole bands between the
+      // two while the fade runs, which reads as the picture changing colour.
       const sampleCanvas = document.createElement("canvas");
       sampleCanvas.width = 240;
       sampleCanvas.height = 320;
       const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true })!;
-      const sampleTimes = [0, 1200, 2400, 3300, 3900, 4700, 5100, 5900];
+      const fade = Array.from({ length: 10 }, (_, i) => 4550 + i * 50);
+      const sampleTimes = [0, 1200, 2400, 3300, 3900, ...fade, 5100, 5900];
       const samples = new Uint8Array(240 * 320 * 4 * sampleTimes.length);
       sampleTimes.forEach((time, i) => {
         renderScene(sampleCtx, frozen, time);

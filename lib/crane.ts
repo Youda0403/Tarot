@@ -364,9 +364,14 @@ export function renderScene(
   });
   if (!rigDrawn) drawRig();
 
-  // Visible mouth of the chute, aligned with the retrieval bay below.
+  ctx.restore();
+  // Visible mouth of the chute, aligned with the retrieval bay below. Drawn
+  // after the window clip is released and ended just inside the cabinet frame:
+  // while it was clipped, the boundary row belonged to the window background
+  // instead of the chute, which showed as a pale hairline between the chute and
+  // the frame at export scales where that row lands on a half pixel.
   ctx.beginPath();
-  ctx.roundRect(288, 418, 76, 57, [5, 5, 0, 0]);
+  ctx.roundRect(288, 418, 76, 30, [5, 5, 0, 0]);
   ctx.fillStyle = "#b9bdc5";
   ctx.fill();
   ctx.strokeStyle = theme.dark;
@@ -374,7 +379,6 @@ export function renderScene(
   ctx.stroke();
   line(294, 422, 358, 422, "#f7f5f0", 2);
 
-  ctx.restore();
   ctx.save();
   ctx.globalAlpha = 0.4;
   line(95, 206, 145, 180, "#fff", 8);
